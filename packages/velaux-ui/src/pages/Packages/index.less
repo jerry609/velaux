@@ -1,24 +1,40 @@
 .packages-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 16px;
-  padding: 10px 12px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-}
-
-.packages-search {
-  flex: 1 1 280px;
-  .packages-search-icon {
-    margin: 0 4px 0 8px;
-    color: #94a3b8;
+  padding: 16px 20px 0;
+  .segmented-picker {
+    width: auto;
+  }
+  .segmented-option {
+    flex: none;
   }
 }
 
-// All, in the cluster or built in, as a segmented control.
+// A package's name, with where it comes from beneath.
+.package-name {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  > span {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+}
+
+.package-name-icon {
+  flex: none;
+  color: var(--c-text-3);
+}
+
+.package-name-title {
+  font-weight: 500;
+}
+
+.package-name-sub {
+  color: var(--c-text-3);
+  font-size: 12px;
+}
+
+// A segmented control: a package's views, and the shared workflows' filters.
 .packages-source,
 .package-tabs {
   display: inline-flex;
@@ -39,16 +55,6 @@
       background: #fff;
       box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
     }
-  }
-}
-
-.package-list {
-  --row-columns: minmax(220px, 1.4fr) minmax(160px, 1.2fr) 120px 90px;
-  .row-list-name {
-    color: inherit;
-  }
-  .row-list-title {
-    color: var(--primary-color, #1b58f4);
   }
 }
 

@@ -1,4 +1,3 @@
-import { Pagination } from '@alifd/next';
 import { connect } from 'dva';
 import React from 'react';
 import type { Dispatch } from 'redux';
@@ -6,14 +5,12 @@ import type { Dispatch } from 'redux';
 import { listRevisions } from '../../api/application';
 import { If } from '../../components/If';
 import type { ApplicationDetail, EnvBinding, ApplicationRevision } from '@velaux/data';
-import { locale } from '../../utils/locale';
+import { TablePager } from '../../components/Console';
 
 import { ShowRevision } from './components/Detail';
 import Header from './components/Header';
 import TableList from './components/List';
 import { statusList } from './constants';
-
-import './index.less';
 
 type Props = {
   revisions: [];
@@ -85,20 +82,21 @@ class ApplicationRevisionList extends React.Component<Props, State> {
   updateQuery = (updateQuery: { isChangeEnv?: boolean; isChangeStatus?: boolean; value: string }) => {
     const { isChangeEnv, isChangeStatus, value } = updateQuery;
     if (isChangeEnv) {
-      this.setState({ envName: value }, () => {
+      this.setState({ envName: value, page: 1 }, () => {
         this.getRevisionList();
       });
     } else if (isChangeStatus) {
-      this.setState({ status: value }, () => {
+      this.setState({ status: value, page: 1 }, () => {
         this.getRevisionList();
       });
     }
   };
 
-  handleChange = (page: number) => {
+  handleChange = (page: number, pageSize: number) => {
     this.setState(
       {
         page,
+        pageSize,
       },
       () => {
         this.getRevisionList();
@@ -115,13 +113,14 @@ class ApplicationRevisionList extends React.Component<Props, State> {
     const { envbinding, applicationDetail, dispatch } = this.props;
 
     return (
-      <div>
+      <div className="console-panel app-tab-panel">
         <Header
           envBinding={envbinding}
           statusList={statusList}
           updateQuery={(params: { isChangeEnv?: boolean; isChangeStatus?: boolean; value: string }) => {
             this.updateQuery(params);
           }}
+          onRefresh={this.getRevisionList}
         />
         <TableList
           applicationDetail={applicationDetail}
@@ -130,12 +129,10 @@ class ApplicationRevisionList extends React.Component<Props, State> {
           getRevisionList={this.getRevisionList}
           dispatch={dispatch}
         />
-        <Pagination
-          locale={locale().Pagination}
-          className="revision-pagination text-align-right"
+        <TablePager
           total={this.state.revisionsListTotal}
+          page={this.state.page}
           pageSize={this.state.pageSize}
-          current={this.state.page}
           onChange={this.handleChange}
         />
         <If condition={showAppRevision}>

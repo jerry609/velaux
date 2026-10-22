@@ -151,8 +151,10 @@ class ApplicationLayout extends Component<Props, any> {
     }
     return (
       <div className="app-layout">
-        <Header dispatch={dispatch} appName={appName} envName={envName} currentPath={url} />
-        <AppTabs appName={appName} currentPath={url} />
+        <div className="detail-card">
+          <Header dispatch={dispatch} appName={appName} envName={envName} currentPath={url} />
+          <AppTabs appName={appName} currentPath={url} />
+        </div>
         {envName && <EnvironmentBar appName={appName} envName={envName} currentPath={url} />}
         <div className="app-content">{children}</div>
       </div>

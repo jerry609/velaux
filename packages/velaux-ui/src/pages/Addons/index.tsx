@@ -3,7 +3,7 @@ import { connect } from 'dva';
 import React from 'react';
 
 import { If } from '../../components/If';
-import { ListTitle } from '../../components/ListTitle';
+import { PageGuide } from '../../components/Console';
 import Permission from '../../components/Permission';
 import { Translation } from '../../components/Translation';
 import type { Addon, AddonBaseStatus } from '@velaux/data';
@@ -15,6 +15,7 @@ import SelectSearch from './components/search/index';
 import Plugin from './components/plugin';
 import i18n from '../../i18n';
 import { AddonApplications } from './components/AddonApplications';
+import { AiOutlineAppstoreAdd, AiOutlineCloudServer, AiOutlineDatabase } from 'react-icons/ai';
 
 import './index.less';
 
@@ -144,9 +145,31 @@ class Addons extends React.Component<Props, State> {
 
     return (
       <div>
-        <ListTitle
+        <PageGuide
+          id="addons"
           title="Addons and VelaUX Plugins"
-          subTitle="Manages extended platform capabilities for KubeVela and VelaUX."
+          description="Manages extended platform capabilities for KubeVela and VelaUX."
+          steps={[
+            {
+              icon: <AiOutlineDatabase />,
+              title: 'Add a registry',
+              description: (
+                <Translation>Point at the registries the addons come from, besides the official one</Translation>
+              ),
+            },
+            {
+              icon: <AiOutlineAppstoreAdd />,
+              title: 'Enable an addon',
+              description: <Translation>Pick an addon, fill in its parameters and the clusters it runs on</Translation>,
+            },
+            {
+              icon: <AiOutlineCloudServer />,
+              title: 'Use its capabilities',
+              description: (
+                <Translation>Its definitions appear in applications, and its applications under Installed</Translation>
+              ),
+            },
+          ]}
         />
 
         <Tab
@@ -161,40 +184,42 @@ class Addons extends React.Component<Props, State> {
           }}
         >
           <Tab.Item title="Addons" key={'addons'}>
-            <SelectSearch
-              dispatch={dispatch}
-              tagList={tagList}
-              registries={registryList}
-              listFunction={this.getAddonsList}
-              onTagChange={(tags: string[]) => {
-                this.setState({ selectTags: tags });
-              }}
-              extButtons={[
-                <Permission request={{ resource: 'addonRegistry:*', action: 'list' }} project={''}>
-                  <Button
-                    type="primary"
-                    onClick={() => {
-                      this.setState({ showRegistryManage: true });
-                    }}
-                  >
-                    <Translation>Addon Registries</Translation>
-                  </Button>
-                </Permission>,
-              ]}
-            />
-            <Loading visible={addonLoading} style={{ width: '100%' }}>
-              <If condition={addonListMessage}>
-                <Message style={{ marginBottom: '16px' }} type="warning">
-                  {addonListMessage}
-                </Message>
-              </If>
-              <CardContend
-                addonLists={addonsList}
-                selectTags={selectTags}
-                enabledAddons={enabledAddons}
-                clickAddon={this.openAddonDetail}
+            <div className="console-panel addon-catalog">
+              <SelectSearch
+                dispatch={dispatch}
+                tagList={tagList}
+                registries={registryList}
+                listFunction={this.getAddonsList}
+                onTagChange={(tags: string[]) => {
+                  this.setState({ selectTags: tags });
+                }}
+                extButtons={[
+                  <Permission request={{ resource: 'addonRegistry:*', action: 'list' }} project={''}>
+                    <Button
+                      type="primary"
+                      onClick={() => {
+                        this.setState({ showRegistryManage: true });
+                      }}
+                    >
+                      <Translation>Addon Registries</Translation>
+                    </Button>
+                  </Permission>,
+                ]}
               />
-            </Loading>
+              <Loading visible={addonLoading} style={{ width: '100%' }}>
+                <If condition={addonListMessage}>
+                  <Message className="addon-catalog-message" type="warning">
+                    {addonListMessage}
+                  </Message>
+                </If>
+                <CardContend
+                  addonLists={addonsList}
+                  selectTags={selectTags}
+                  enabledAddons={enabledAddons}
+                  clickAddon={this.openAddonDetail}
+                />
+              </Loading>
+            </div>
             <If condition={showAddonDetail}>
               <AddonDetailDialog
                 onClose={this.closeAddonDetail}
@@ -217,12 +242,16 @@ class Addons extends React.Component<Props, State> {
             </If>
           </Tab.Item>
           <Tab.Item title={i18n.t('Installed').toString()} key={'applications'}>
-            <AddonApplications />
+            <div className="console-panel">
+              <AddonApplications />
+            </div>
           </Tab.Item>
           <Tab.Item title="VelaUX Plugins" key={'plugins'}>
-            <Loading visible={pluginLoading} style={{ width: '100%' }}>
-              <Plugin dispatch={dispatch} history={history}></Plugin>
-            </Loading>
+            <div className="console-panel addons-tab-panel">
+              <Loading visible={pluginLoading} style={{ width: '100%' }}>
+                <Plugin dispatch={dispatch} history={history}></Plugin>
+              </Loading>
+            </div>
           </Tab.Item>
         </Tab>
       </div>

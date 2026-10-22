@@ -3,14 +3,16 @@ import { Link } from 'dva/router';
 import React, { Fragment, Component } from 'react';
 
 import { deleteProject } from '../../api/project';
+import { ListToolbar, RowLinks, TablePager, pageOf } from '../../components/Console';
 import { ListTitle as Title } from '../../components/ListTitle';
 import { Translation } from '../../components/Translation';
-import type { NameAlias , Project } from '@velaux/data';
+import type { NameAlias, Project } from '@velaux/data';
 import { momentDate } from '../../utils/common';
 import { locale } from '../../utils/locale';
 import { connect } from 'dva';
 import { LoginUserInfo } from '@velaux/data';
 import i18n from '../../i18n';
+import { locationService } from '../../services/LocationService';
 
 type Props = {
   dispatch: ({}) => void;
@@ -19,6 +21,9 @@ type Props = {
 
 type State = {
   isLoading: boolean;
+  query: string;
+  page: number;
+  pageSize: number;
 };
 
 @connect((store: any) => {
@@ -29,6 +34,9 @@ class MyProjectList extends Component<Props, State> {
     super(props);
     this.state = {
       isLoading: false,
+      query: '',
+      page: 1,
+      pageSize: 10,
     };
   }
   componentDidMount() {}
@@ -126,20 +134,66 @@ class MyProjectList extends Component<Props, State> {
           );
         },
       },
+      {
+        key: 'operation',
+        title: <Translation>Actions</Translation>,
+        dataIndex: 'operation',
+        width: 180,
+        lock: 'right',
+        cell: (v: string, i: number, record: Project) => (
+          <RowLinks
+            links={[
+              { label: 'Details', onClick: () => locationService.push(`/projects/${record.name}`) },
+              { label: 'Applications', onClick: () => locationService.push(`/projects/${record.name}/applications`) },
+            ]}
+          />
+        ),
+      },
     ];
 
     const { Column } = Table;
-    const { isLoading } = this.state;
+    const { isLoading, query, pageSize } = this.state;
     const { userInfo } = this.props;
+    // The search narrows the projects the user is in, by name or alias.
+    const keyword = query.trim().toLowerCase();
+    const projects = (userInfo?.projects || []).filter(
+      (p) => !keyword || p.name.toLowerCase().includes(keyword) || (p.alias || '').toLowerCase().includes(keyword)
+    );
+    const page = Math.min(this.state.page, Math.max(1, Math.ceil(projects.length / pageSize)));
     return (
       <Fragment>
         <div className="project-list-content">
           <Title title="Projects" subTitle={i18n.t('Project are used for users and applications isolation')} />
-          <Table locale={locale().Table} dataSource={userInfo?.projects} loading={isLoading}>
-            {columns.map((col, key) => (
-              <Column {...col} key={key} align={'left'} />
-            ))}
-          </Table>
+          <div className="console-panel">
+            <div className="console-panel-body">
+              <ListToolbar
+                search={{
+                  value: query,
+                  placeholder: 'Search by name or alias',
+                  live: true,
+                  onSearch: (value: string) => this.setState({ query: value, page: 1 }),
+                }}
+                onRefresh={this.loadUserInfo}
+                refreshing={isLoading}
+              />
+            </div>
+            <Table
+              locale={locale().Table}
+              dataSource={pageOf(projects, page, pageSize)}
+              loading={isLoading}
+              primaryKey="name"
+            >
+              {columns.map((col, key) => (
+                <Column {...col} key={key} align={'left'} />
+              ))}
+            </Table>
+            <TablePager
+              total={projects.length}
+              page={page}
+              pageSize={pageSize}
+              onChange={(p, size) => this.setState({ page: p, pageSize: size })}
+            />
+          </div>
         </div>
       </Fragment>
     );

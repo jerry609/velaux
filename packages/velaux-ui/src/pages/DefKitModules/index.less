@@ -16,17 +16,20 @@
   border-radius: 999px;
 }
 
-.defkit-list {
-  --row-columns: minmax(200px, 1.2fr) minmax(220px, 1.6fr) 170px minmax(140px, 1fr) 110px;
-  .row-list-name {
-    color: inherit;
+.defkit-toolbar {
+  padding: 16px 20px 0;
+  // With no search, the toolbar's actions keep to the right.
+  .list-toolbar {
+    justify-content: flex-end;
   }
-  .row-list-code {
-    display: block;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
+}
+
+.defkit-source {
+  display: block;
+  max-width: 360px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .defkit-definitions {

@@ -1,11 +1,12 @@
-import { Button } from '@alifd/next';
+import { Button, Table } from '@alifd/next';
 import { Link, routerRedux } from 'dva/router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { Fragment, useCallback, useEffect, useState } from 'react';
 import { connect } from 'dva';
 import { BsBoxes } from 'react-icons/bs';
 
 import type { DefKitModule } from '@velaux/data';
 import { listDefKitModules } from '../../api/defkit';
+import { ListToolbar, RowLinks, TablePager, pageOf } from '../../components/Console';
 import Empty from '../../components/Empty';
 import { ListTitle } from '../../components/ListTitle';
 import Permission from '../../components/Permission';
@@ -14,6 +15,8 @@ import '../../components/RowList';
 import { StatusBadge } from '../../components/StatusBadge';
 import { Translation } from '../../components/Translation';
 import i18n from '../../i18n';
+import { locationService } from '../../services/LocationService';
+import { locale } from '../../utils/locale';
 import '../Packages/index.less';
 import { autoText, busy, kindLabels, phaseLabels, phaseTones, sourceText } from './defkit';
 import { ModuleDialog } from './ModuleDialog';
@@ -33,6 +36,8 @@ const DefKitModules = (props: { dispatch: (action: any) => void }) => {
   const [addonEnabled, setAddonEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const load = useCallback(
     () =>
       listDefKitModules()
@@ -54,18 +59,12 @@ const DefKitModules = (props: { dispatch: (action: any) => void }) => {
     const timer = setInterval(load, 5000);
     return () => clearInterval(timer);
   }, [anyBusy, load]);
+  const current = Math.min(page, Math.max(1, Math.ceil(modules.length / pageSize)));
   return (
     <div className="packages defkit">
       <ListTitle
         title="DefKit"
         subTitle="Definition modules written in Go with DefKit, rendered and reviewed before they install"
-        extButtons={[
-          <Permission key="add" request={{ resource: 'defkit:*', action: 'create' }} project={''}>
-            <Button type="primary" disabled={!addonEnabled} onClick={() => setAdding(true)}>
-              <Translation>Add module</Translation>
-            </Button>
-          </Permission>,
-        ]}
       />
       <div className="defkit-experimental">
         <span className="defkit-experimental-pill">
@@ -85,65 +84,109 @@ const DefKitModules = (props: { dispatch: (action: any) => void }) => {
           </Link>
         </div>
       )}
-      {!loading && modules.length === 0 ? (
-        <Empty message={<Translation>No DefKit modules</Translation>} />
-      ) : (
-        <div className="row-list defkit-list">
-          <div className="row-list-head">
-            <span>
-              <Translation>Name</Translation>
-            </span>
-            <span>
-              <Translation>Source</Translation>
-            </span>
-            <span>
-              <Translation>Status</Translation>
-            </span>
-            <span>
-              <Translation>Definitions</Translation>
-            </span>
-            <span>
-              <Translation>Updated</Translation>
-            </span>
-          </div>
-          {modules.map((m) => (
-            <div key={m.name} className="row-list-row">
-              <div className="row-list-main">
-                <Link className="row-list-name" to={`/defkit/${m.name}`}>
-                  <BsBoxes className="row-list-icon" />
-                  <span>
-                    <span className="row-list-title">{m.name}</span>
-                    <span className="row-list-type">{m.info?.description || m.info?.name}</span>
-                  </span>
-                </Link>
-                <span>
-                  <code className="row-list-code" title={sourceText(m.source)}>
+      <div className="console-panel">
+        <div className="defkit-toolbar">
+          <ListToolbar
+            onRefresh={load}
+            refreshing={loading}
+            actions={
+              <Permission request={{ resource: 'defkit:*', action: 'create' }} project={''}>
+                <Button type="primary" disabled={!addonEnabled} onClick={() => setAdding(true)}>
+                  <Translation>Add module</Translation>
+                </Button>
+              </Permission>
+            }
+          />
+        </div>
+        {!loading && modules.length === 0 ? (
+          <Empty message={<Translation>No DefKit modules</Translation>} />
+        ) : (
+          <Fragment>
+            <Table
+              locale={locale().Table}
+              dataSource={pageOf(modules, current, pageSize)}
+              loading={loading}
+              primaryKey="name"
+            >
+              <Table.Column
+                title={<Translation>Name</Translation>}
+                dataIndex="name"
+                width={240}
+                cell={(v: string, i: number, m: DefKitModule) => (
+                  <Link className="package-name" to={`/defkit/${m.name}`}>
+                    <BsBoxes className="package-name-icon" />
+                    <span>
+                      <span className="package-name-title">{m.name}</span>
+                      <span className="package-name-sub">{m.info?.description || m.info?.name}</span>
+                    </span>
+                  </Link>
+                )}
+              />
+              <Table.Column
+                title={<Translation>Source</Translation>}
+                dataIndex="source"
+                cell={(v: any, i: number, m: DefKitModule) => (
+                  <code className="row-list-code defkit-source" title={sourceText(m.source)}>
                     {sourceText(m.source)}
                   </code>
-                </span>
-                <span>
-                  {m.phase === 'review' ? (
-                    <Link to={`/defkit/${m.name}?tab=review`}>
-                      <StatusBadge tone={phaseTones[m.phase]} label={phaseLabels[m.phase]} />
-                    </Link>
-                  ) : (
+                )}
+              />
+              <Table.Column
+                title={<Translation>Status</Translation>}
+                dataIndex="phase"
+                width={180}
+                cell={(v: any, i: number, m: DefKitModule) => (
+                  <span>
                     <StatusBadge tone={phaseTones[m.phase]} label={phaseLabels[m.phase]} title={m.message} />
-                  )}
-                  {m.settings?.autoUpdate && (
-                    <span className="defkit-auto">
-                      <Translation>Auto update every</Translation> {autoText(m.settings)}
-                    </span>
-                  )}
-                </span>
-                <span>{countsText(m.counts) || '-'}</span>
-                <span>
-                  <RelativeTime time={m.updateTime} />
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+                    {m.settings?.autoUpdate && (
+                      <span className="defkit-auto">
+                        <Translation>Auto update every</Translation> {autoText(m.settings)}
+                      </span>
+                    )}
+                  </span>
+                )}
+              />
+              <Table.Column
+                title={<Translation>Definitions</Translation>}
+                dataIndex="counts"
+                cell={(v: any, i: number, m: DefKitModule) => countsText(m.counts) || '-'}
+              />
+              <Table.Column
+                title={<Translation>Updated</Translation>}
+                dataIndex="updateTime"
+                width={120}
+                cell={(v: string) => <RelativeTime time={v} />}
+              />
+              <Table.Column
+                title={<Translation>Actions</Translation>}
+                lock="right"
+                width={140}
+                cell={(v: any, i: number, m: DefKitModule) => (
+                  <RowLinks
+                    links={[
+                      { label: 'Details', onClick: () => locationService.push(`/defkit/${m.name}`) },
+                      {
+                        label: 'Review',
+                        hidden: m.phase !== 'review',
+                        onClick: () => locationService.push(`/defkit/${m.name}?tab=review`),
+                      },
+                    ]}
+                  />
+                )}
+              />
+            </Table>
+            <TablePager
+              total={modules.length}
+              page={current}
+              pageSize={pageSize}
+              onChange={(p, size) => {
+                setPage(p);
+                setPageSize(size);
+              }}
+            />
+          </Fragment>
+        )}
+      </div>
       {adding && (
         <ModuleDialog
           onClose={() => setAdding(false)}

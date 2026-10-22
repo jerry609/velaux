@@ -1,8 +1,8 @@
-import { Field, Grid, Radio, Input, Message, Switch, Select, Dialog, Card, Button, Form } from '@alifd/next';
+import { Field, Radio, Input, Message, Switch, Select, Dialog, Button, Form } from '@alifd/next';
 import { connect } from 'dva';
 import { routerRedux } from 'dva/router';
 import React from 'react';
-import { AiOutlineDelete, AiOutlinePlus } from 'react-icons/ai';
+import { AiOutlineMinusCircle, AiOutlinePlus } from 'react-icons/ai';
 import { v4 as uuid } from 'uuid';
 import { MdOutlineHelpCenter } from 'react-icons/md';
 
@@ -16,11 +16,11 @@ import { locale } from '../../utils/locale';
 import { checkPermission } from '../../utils/permission';
 import { CustomSelect } from '../../components/CustomSelect';
 import { If } from '../../components/If';
-import Item from '../../components/Item';
+import { FormGrid, LabelTip, Panel } from '../../components/Console';
+import { ListTitle } from '../../components/ListTitle';
 import CustomisationCard from './components/Customisation';
 import { Dispatch } from 'redux';
-
-const { Col, Row } = Grid;
+import './index.less';
 
 type Props = {
   onClose: () => void;
@@ -298,144 +298,132 @@ class PlatformSetting extends React.Component<Props, State> {
     const { systemInfo } = this.props;
     const { defaultProjectItems } = this.state;
     return (
-      <div className="container">
-        <Card locale={locale().Card} contentHeight="auto" style={{ marginBottom: 'var(--spacing-4)' }}>
-          <div className="setting-version">
-            <Row>
-              <Col span={12}>
-                <Item label="Version" value={systemInfo.systemVersion?.velaVersion}></Item>
-              </Col>
-              <Col span={12}>
-                <Item label="GitVersion" value={systemInfo.systemVersion?.gitVersion}></Item>
-              </Col>
-            </Row>
-          </div>
-        </Card>
-        <Form field={this.field} labelCol={{ fixedSpan: 8 }} wrapperCol={{ span: 16 }}>
-          <Card
-            style={{ marginBottom: '16px' }}
-            locale={locale().Card}
-            contentHeight="200px"
-            title={<Translation>User authentication configuration</Translation>}
-          >
-            <Row wrap={true}>
-              <Col span={24}>
-                <Form.Item required={true} label={i18n.t('User login mode').toString()}>
-                  <Radio.Group
-                    {...this.field.init('loginType', {
-                      rules: [{ required: true }],
-                    })}
-                  >
-                    <Radio value="local" id="local">
-                      <Translation>Local</Translation>
-                    </Radio>
-                    <Radio value="dex" id="dex">
-                      <Translation>SSO by dex</Translation>
-                    </Radio>
-                  </Radio.Group>
-                </Form.Item>
-                <If condition={this.field.getValue('loginType') == 'dex'}>
-                  <a href={this.generateDexAddress()} target="_blank" rel="noopener noreferrer">
-                    <Translation>Click me to open the dex login page</Translation>
-                  </a>
-                </If>
-              </Col>
-              <Col span={24}>
-                <Form.Item
-                  required={true}
-                  label={i18n.t('VelaUX address').toString()}
-                  help={i18n.t('There will auto get the domain for access the VelaUX').toString()}
+      <div className="platform-setting">
+        <ListTitle title="Settings" subTitle="The platform's version, how users sign in, and the console's look" />
+        <Panel title="Version">
+          <dl className="setting-facts">
+            <div>
+              <dt>
+                <Translation>Version</Translation>
+              </dt>
+              <dd>{systemInfo.systemVersion?.velaVersion || '-'}</dd>
+            </div>
+            <div>
+              <dt>
+                <Translation>GitVersion</Translation>
+              </dt>
+              <dd>{systemInfo.systemVersion?.gitVersion || '-'}</dd>
+            </div>
+          </dl>
+        </Panel>
+        <Form field={this.field} labelAlign="top" fullWidth>
+          <Panel title="User authentication configuration">
+            <FormGrid columns={2}>
+              <Form.Item required={true} label={<LabelTip label="User login mode" />}>
+                <Radio.Group
+                  {...this.field.init('loginType', {
+                    rules: [{ required: true }],
+                  })}
                 >
-                  <Input
-                    {...this.field.init('velaAddress', {
-                      initValue: this.getIssuerDefaultValue(),
-                      rules: [{ required: true }],
-                    })}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={24}>
-                <Form.Item label={i18n.t('Setting the default projects for the dex login user').toString()}>
-                  <div className="flexright" style={{ marginBottom: '8px' }}>
-                    <Button onClick={this.onAddItem}>
-                      <AiOutlinePlus />
-                    </Button>
+                  <Radio value="local" id="local">
+                    <Translation>Local</Translation>
+                  </Radio>
+                  <Radio value="dex" id="dex">
+                    <Translation>SSO by dex</Translation>
+                  </Radio>
+                </Radio.Group>
+                <If condition={this.field.getValue('loginType') == 'dex'}>
+                  <div className="setting-dex-link">
+                    <a href={this.generateDexAddress()} target="_blank" rel="noopener noreferrer">
+                      <Translation>Click me to open the dex login page</Translation>
+                    </a>
                   </div>
+                </If>
+              </Form.Item>
+              <Form.Item
+                required={true}
+                label={<LabelTip label="VelaUX address" tip="There will auto get the domain for access the VelaUX" />}
+              >
+                <Input
+                  {...this.field.init('velaAddress', {
+                    initValue: this.getIssuerDefaultValue(),
+                    rules: [{ required: true }],
+                  })}
+                />
+              </Form.Item>
+              <Form.Item
+                className="form-grid-span"
+                label={<LabelTip label="Setting the default projects for the dex login user" />}
+              >
+                <div className="setting-default-projects">
                   {defaultProjectItems.map((item) => {
                     return (
-                      <Row id={item.id} key={item.id}>
-                        <Col span={8} style={{ padding: '0 4px' }}>
-                          <Form.Item labelAlign="inset" required={true} label={i18n.t('Project').toString()}>
-                            <Select
-                              locale={locale().Select}
-                              {...this.field.init(`${item.id}-name`, {
-                                rules: [{ required: true }],
-                                initValue: item.name,
-                              })}
-                              dataSource={this.generateProjectOptions()}
-                            />
-                          </Form.Item>
-                        </Col>
-                        <Col span={12} style={{ padding: '0 4px' }}>
-                          <Form.Item labelAlign="inset" required={true} label={i18n.t('Roles').toString()}>
-                            <CustomSelect
-                              locale={locale().Select}
-                              {...this.field.init(`${item.id}-roles`, {
-                                rules: [{ required: true }],
-                                initValue: item.roles,
-                              })}
-                              dataSource={this.generateProjectRoleOptions()}
-                              mode="multiple"
-                            />
-                          </Form.Item>
-                        </Col>
-                        <Col span={4}>
-                          <div className="flexright">
-                            <Button onClick={() => this.onRemoveItem(item.id)}>
-                              <AiOutlineDelete />
-                            </Button>
-                          </div>
-                        </Col>
-                      </Row>
+                      <div className="setting-default-project" id={item.id} key={item.id}>
+                        <Form.Item labelAlign="inset" required={true} label={i18n.t('Project').toString()}>
+                          <Select
+                            locale={locale().Select}
+                            {...this.field.init(`${item.id}-name`, {
+                              rules: [{ required: true }],
+                              initValue: item.name,
+                            })}
+                            dataSource={this.generateProjectOptions()}
+                          />
+                        </Form.Item>
+                        <Form.Item labelAlign="inset" required={true} label={i18n.t('Roles').toString()}>
+                          <CustomSelect
+                            locale={locale().Select}
+                            {...this.field.init(`${item.id}-roles`, {
+                              rules: [{ required: true }],
+                              initValue: item.roles,
+                            })}
+                            dataSource={this.generateProjectRoleOptions()}
+                            mode="multiple"
+                          />
+                        </Form.Item>
+                        <span
+                          className="kv-remove"
+                          role="button"
+                          aria-label={i18n.t('Remove').toString()}
+                          onClick={() => this.onRemoveItem(item.id)}
+                        >
+                          <AiOutlineMinusCircle />
+                        </span>
+                      </div>
                     );
                   })}
-                </Form.Item>
-              </Col>
-            </Row>
-          </Card>
+                  <span className="kv-add" role="button" onClick={this.onAddItem}>
+                    <AiOutlinePlus />
+                    <Translation>Add project</Translation>
+                  </span>
+                </div>
+              </Form.Item>
+            </FormGrid>
+          </Panel>
 
-          <Card
-            style={{ marginBottom: '16px' }}
-            locale={locale().Card}
-            contentHeight="200px"
-            title={
-              <span>
-                <Translation>User experience improvement plan</Translation>
-                <a
-                  target="_blank"
-                  href="https://kubevela.io/docs/reference/user-improvement-plan"
-                  rel="noopener noreferrer"
-                >
-                  <MdOutlineHelpCenter size={16} style={{ marginLeft: '4px' }}></MdOutlineHelpCenter>
-                </a>
-              </span>
+          <Panel
+            title="User experience improvement plan"
+            actions={
+              <a
+                target="_blank"
+                href="https://kubevela.io/docs/reference/user-improvement-plan"
+                rel="noopener noreferrer"
+              >
+                <MdOutlineHelpCenter size={16} />
+              </a>
             }
           >
-            <Item
-              label={i18n.t('Contribution')}
-              value={
-                <Switch
-                  size="medium"
-                  {...this.field.init('enableCollection', {
-                    rules: [{ required: true }],
-                    initValue: systemInfo.enableCollection,
-                  })}
-                  checked={this.field.getValue('enableCollection')}
-                />
-              }
-            />
-          </Card>
-          <div className="flexright">
+            <Form.Item label={<LabelTip label="Contribution" />}>
+              <Switch
+                size="medium"
+                {...this.field.init('enableCollection', {
+                  rules: [{ required: true }],
+                  initValue: systemInfo.enableCollection,
+                })}
+                checked={this.field.getValue('enableCollection')}
+              />
+            </Form.Item>
+          </Panel>
+          <div className="setting-actions">
             <Button type="primary" onClick={this.onUpdate}>
               <Translation>Submit</Translation>
             </Button>

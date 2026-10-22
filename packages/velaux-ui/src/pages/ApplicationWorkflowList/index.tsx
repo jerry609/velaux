@@ -2,16 +2,14 @@ import { Dialog, Message, Table } from '@alifd/next';
 import { connect } from 'dva';
 import { Link, routerRedux } from 'dva/router';
 import React from 'react';
-import { RowAction } from '../../components/RowAction';
-import { AiOutlineDelete, AiOutlineEdit } from 'react-icons/ai';
 import type { Dispatch } from 'redux';
 
 import { deleteWorkflow } from '../../api/workflows';
-import { If } from '../../components/If';
-import Permission from '../../components/Permission';
+import { ListToolbar, RowLinks, TablePager, pageOf } from '../../components/Console';
 import { Translation } from '../../components/Translation';
 import i18n from '../../i18n';
-import type { ApplicationDetail, EnvBinding, Workflow } from '@velaux/data';
+import type { ApplicationDetail, EnvBinding, LoginUserInfo, Workflow } from '@velaux/data';
+import { checkPermission } from '../../utils/permission';
 import { momentDate } from '../../utils/common';
 import { locale } from '../../utils/locale';
 
@@ -21,6 +19,7 @@ type Props = {
   envbinding?: EnvBinding[];
   workflows: Workflow[];
   dispatch: Dispatch<any>;
+  userInfo?: LoginUserInfo;
   match: {
     params: {
       appName: string;
@@ -28,15 +27,18 @@ type Props = {
   };
 };
 
-type State = {};
+type State = {
+  page: number;
+  pageSize: number;
+};
 
 @connect((store: any) => {
-  return { ...store.application };
+  return { ...store.application, userInfo: store.user.userInfo };
 })
 class ApplicationWorkflowList extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = {};
+    this.state = { page: 1, pageSize: 10 };
   }
 
   componentDidMount() {}
@@ -74,16 +76,30 @@ class ApplicationWorkflowList extends React.Component<Props, State> {
   };
 
   render() {
-    const { applicationDetail, workflows } = this.props;
+    const { applicationDetail, workflows, userInfo } = this.props;
     const projectName = applicationDetail?.project?.name;
+    const list = workflows || [];
+    const { pageSize } = this.state;
+    const page = Math.min(this.state.page, Math.max(1, Math.ceil(list.length / pageSize)));
+    const studio = (w: Workflow) =>
+      `/applications/${applicationDetail?.name}/envbinding/${w.envName}/workflow/${w.name}/studio`;
+    const may = (w: Workflow, action: string) =>
+      checkPermission(
+        { resource: `project:${projectName}/application:${applicationDetail?.name}/workflow:${w.name}`, action },
+        projectName,
+        userInfo
+      );
     return (
-      <div>
-        <div className="app-tab-toolbar">
-          <span className="app-tab-hint">
-            <Translation>The workflow each environment deploys with. Open one to edit its steps.</Translation>
-          </span>
-        </div>
-        <Table dataSource={workflows}>
+      <div className="console-panel app-tab-panel">
+        <ListToolbar
+          filters={
+            <span className="app-tab-hint">
+              <Translation>The workflow each environment deploys with. Open one to edit its steps.</Translation>
+            </span>
+          }
+          onRefresh={this.loadApplicationWorkflows}
+        />
+        <Table dataSource={pageOf(list, page, pageSize)} primaryKey="name" locale={locale().Table}>
           <Table.Column
             dataIndex="name"
             title={i18n.t('Name').toString()}
@@ -91,11 +107,7 @@ class ApplicationWorkflowList extends React.Component<Props, State> {
               if (applicationDetail?.readOnly) {
                 return v;
               }
-              return (
-                <Link to={`/applications/${applicationDetail?.name}/envbinding/${w.envName}/workflow/${v}/studio`}>
-                  {v}
-                </Link>
-              );
+              return <Link to={studio(w)}>{v}</Link>;
             }}
           />
           <Table.Column
@@ -130,55 +142,39 @@ class ApplicationWorkflowList extends React.Component<Props, State> {
           <Table.Column
             dataIndex="name"
             title={i18n.t('Action').toString()}
+            width={200}
+            lock="right"
             cell={(v: string, i: number, w: Workflow) => {
+              // The workflow an environment was given on binding goes with it.
+              const envDefault = v == 'workflow-' + w.envName;
               return (
-                <div>
-                  {!applicationDetail?.readOnly && (
-                    <React.Fragment>
-                      <Permission
-                        project={projectName}
-                        request={{
-                          resource: `project:${projectName}/application:${applicationDetail?.name}/workflow:${v}`,
-                          action: 'update',
-                        }}
-                      >
-                        <RowAction
-                          icon={<AiOutlineEdit />}
-                          label="Edit"
-                          onClick={() => {
-                            this.props.dispatch(
-                              routerRedux.push(
-                                `/applications/${applicationDetail?.name}/envbinding/${w.envName}/workflow/${v}/studio`
-                              )
-                            );
-                          }}
-                        />
-                      </Permission>
-                      <If condition={v != 'workflow-' + w.envName}>
-                        <Permission
-                          project={projectName}
-                          request={{
-                            resource: `project:${projectName}/application:${applicationDetail?.name}/workflow:${v}`,
-                            action: 'delete',
-                          }}
-                        >
-                          <RowAction
-                            icon={<AiOutlineDelete />}
-                            label="Remove"
-                            danger
-                            onClick={() => {
-                              this.onDeleteWorkflow(v);
-                            }}
-                          />
-                        </Permission>
-                      </If>
-                    </React.Fragment>
-                  )}
-                </div>
+                <RowLinks
+                  links={[
+                    {
+                      label: 'Edit',
+                      hidden: applicationDetail?.readOnly || !may(w, 'update'),
+                      onClick: () => this.props.dispatch(routerRedux.push(studio(w))),
+                    },
+                    {
+                      label: 'Remove',
+                      danger: true,
+                      hidden: applicationDetail?.readOnly || !may(w, 'delete'),
+                      disabled: envDefault,
+                      reason: "An environment's own workflow goes with the environment",
+                      onClick: () => this.onDeleteWorkflow(v),
+                    },
+                  ]}
+                />
               );
             }}
           />
         </Table>
+        <TablePager
+          total={list.length}
+          page={page}
+          pageSize={pageSize}
+          onChange={(p, size) => this.setState({ page: p, pageSize: size })}
+        />
       </div>
     );
   }

@@ -3,12 +3,10 @@ import i18n from 'i18next';
 import { connect } from 'dva';
 import { Link } from 'dva/router';
 import _ from 'lodash';
-import { AiOutlineCheckCircle, AiOutlinePieChart, AiOutlineStop } from 'react-icons/ai';
-import React, { Component, Fragment } from 'react';
-import { RowAction } from '../../components/RowAction';
+import React, { Component } from 'react';
 
 import { getDefinitionsList, updateDefinitionStatus } from '../../api/definitions';
-import Permission from '../../components/Permission';
+import { ListToolbar, RowLinks, TablePager, pageOf } from '../../components/Console';
 import { RestrictionTags } from '../../components/RestrictionTags';
 import { StatusBadge } from '../../components/StatusBadge';
 import { Translation } from '../../components/Translation';
@@ -19,7 +17,6 @@ import type { DefinitionBase, DefinitionRestrictions, LoginUserInfo } from '@vel
 import { locale } from '../../utils/locale';
 import { getMatchParamObj } from '../../utils/utils';
 
-import SelectSearch from './components/SelectSearch';
 import { PolicyScopeTag } from '../../components/PolicyScopeTag';
 import { UsageDialog } from './components/UsageDialog';
 
@@ -45,6 +42,8 @@ type State = {
   isLoading: boolean;
   searchValue: string;
   searchList: DefinitionBase[];
+  page: number;
+  pageSize: number;
   // usageOf is the definition whose quota usage is shown.
   usageOf?: DefinitionBase;
 };
@@ -61,6 +60,8 @@ class Definitions extends Component<Props, State> {
       isLoading: false,
       searchValue: '',
       searchList: [],
+      page: 1,
+      pageSize: 20,
     };
   }
   componentDidMount() {
@@ -171,6 +172,7 @@ class Definitions extends Component<Props, State> {
     this.setState({
       searchValue: value,
       searchList: newList,
+      page: 1,
     });
   };
 
@@ -184,7 +186,10 @@ class Definitions extends Component<Props, State> {
   };
 
   render() {
-    const { definitionType, isLoading, searchValue, usageOf } = this.state;
+    const { definitionType, isLoading, searchValue, usageOf, pageSize } = this.state;
+    const data = this.getDataSource();
+    // A narrower search keeps the page in range.
+    const page = Math.min(this.state.page, Math.max(1, Math.ceil(data.length / pageSize)));
     const columns = [
       {
         key: 'name',
@@ -276,37 +281,33 @@ class Definitions extends Component<Props, State> {
         key: 'operation',
         title: <Translation>Actions</Translation>,
         dataIndex: 'operation',
+        lock: 'right',
+        width: 160,
         cell: (v: string, i: number, record: DefinitionBase) => {
+          const place = this.place(record);
+          const project = place.where === 'project' ? this.project() : '';
+          const may = (action: string) =>
+            checkPermission({ resource: definitionResource(place, record.name), action }, project, this.props.userInfo);
+          const enabled = record.status === 'enable';
           return (
-            <Fragment>
-              <Permission
-                request={{
-                  resource: definitionResource(this.place(record), record.name),
-                  action: 'update',
-                }}
-                project={this.place(record).where === 'project' ? this.project() : ''}
-              >
-                <RowAction
-                  icon={record.status === 'enable' ? <AiOutlineStop /> : <AiOutlineCheckCircle />}
-                  label={record.status === 'enable' ? 'Disable' : 'Enable'}
-                  danger={record.status === 'enable'}
-                  onClick={() => this.onChangeStatus(record)}
-                />
-              </Permission>
-              {(definitionType === 'component' || definitionType === 'trait') &&
-                (record.restrictions?.quota || []).length > 0 && (
-                  <Permission
-                    request={{ resource: definitionResource(this.place(record), record.name), action: 'detail' }}
-                    project={this.place(record).where === 'project' ? this.project() : ''}
-                  >
-                    <RowAction
-                      icon={<AiOutlinePieChart />}
-                      label="Usage"
-                      onClick={() => this.setState({ usageOf: record })}
-                    />
-                  </Permission>
-                )}
-            </Fragment>
+            <RowLinks
+              links={[
+                {
+                  label: enabled ? 'Disable' : 'Enable',
+                  danger: enabled,
+                  hidden: !may('update'),
+                  onClick: () => this.onChangeStatus(record),
+                },
+                {
+                  label: 'Usage',
+                  hidden:
+                    !(definitionType === 'component' || definitionType === 'trait') ||
+                    (record.restrictions?.quota || []).length === 0 ||
+                    !may('detail'),
+                  onClick: () => this.setState({ usageOf: record }),
+                },
+              ]}
+            />
           );
         },
       },
@@ -314,26 +315,36 @@ class Definitions extends Component<Props, State> {
 
     const { Column } = Table;
     return (
-      <div className="definitions-list-content">
-        <SelectSearch
-          searchValue={searchValue}
-          handleChangName={(value: string) => {
-            this.handleChangName(value);
-          }}
-        />
+      <div className="definitions-list-content console-panel">
+        <div className="definitions-toolbar">
+          <ListToolbar
+            search={{
+              value: searchValue,
+              placeholder: 'Search by definition name',
+              live: true,
+              onSearch: (value: string) => this.handleChangName(value),
+            }}
+            onRefresh={() => this.lisDefinitions()}
+            refreshing={isLoading}
+          />
+        </div>
         <Table
           id="definitionTable"
           locale={locale().Table}
-          dataSource={this.getDataSource()}
+          dataSource={pageOf(data, page, pageSize)}
           loading={isLoading}
-          fixedHeader={true}
-          maxBodyHeight={'calc(100vh - 100px)'}
-          className="margin-16"
+          primaryKey="name"
         >
           {columns.map((col, key) => (
             <Column {...col} key={key} align={'left'} />
           ))}
         </Table>
+        <TablePager
+          total={data.length}
+          page={page}
+          pageSize={pageSize}
+          onChange={(p, size) => this.setState({ page: p, pageSize: size })}
+        />
         {usageOf && (definitionType === 'component' || definitionType === 'trait') && (
           <UsageDialog
             definition={usageOf}

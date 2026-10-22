@@ -1,4 +1,3 @@
-import { Grid } from '@alifd/next';
 import { connect } from 'dva';
 import { Link } from 'dva/router';
 import React, { Component, Fragment } from 'react';
@@ -8,10 +7,7 @@ import { Breadcrumb } from '../../components/Breadcrumb';
 import './index.less';
 import type { ProjectDetail, LoginUserInfo } from '@velaux/data';
 import { checkPermission } from '../../utils/permission';
-
-import classNames from 'classnames';
-
-const { Row, Col } = Grid;
+import { momentDate } from '../../utils/common';
 
 type Props = {
   activeId: string;
@@ -89,9 +85,15 @@ class ProjectLayout extends Component<Props> {
     }
 
     const nav = list.map((item) => {
-      const active = this.props.activeId === item.id ? 'active' : '';
+      const active = this.props.activeId === item.id;
       return (
-        <Link key={item.id} className={active} to={item.to}>
+        <Link
+          key={item.id}
+          role="tab"
+          aria-selected={active}
+          className={active ? 'project-tab active' : 'project-tab'}
+          to={item.to}
+        >
           {item.name}
         </Link>
       );
@@ -105,24 +107,58 @@ class ProjectLayout extends Component<Props> {
     const projectName = projectDetails?.alias || projectDetails?.name || '';
     return (
       <Fragment>
-        <Row>
-          <Col span={6} className={classNames('breadcrumb')}>
+        <div className="detail-card">
+          <div className="detail-head">
             <Breadcrumb
               items={[
                 {
                   to: '/projects',
-                  title: 'Projects',
+                  title: <Translation>Projects</Translation>,
                 },
                 {
                   title: projectName,
                 },
               ]}
             />
-          </Col>
-        </Row>
-        <nav className="project-detail-wrapper">
-          <ul>{menu}</ul>
-        </nav>
+            <div className="detail-head-main">
+              <h1 className="detail-head-name">{projectName}</h1>
+              {projectDetails?.alias && projectDetails.alias !== projectDetails.name && (
+                <span className="detail-head-id">{projectDetails.name}</span>
+              )}
+            </div>
+            <dl className="detail-head-facts">
+              <div>
+                <dt>
+                  <Translation>Owner</Translation>
+                </dt>
+                <dd>{projectDetails?.owner?.alias || projectDetails?.owner?.name || '-'}</dd>
+              </div>
+              <div>
+                <dt>
+                  <Translation>Created</Translation>
+                </dt>
+                <dd>{momentDate(projectDetails?.createTime) || '-'}</dd>
+              </div>
+              <div>
+                <dt>
+                  <Translation>Updated</Translation>
+                </dt>
+                <dd>{momentDate(projectDetails?.updateTime) || '-'}</dd>
+              </div>
+              {projectDetails?.description && (
+                <div className="detail-head-wide">
+                  <dt>
+                    <Translation>Description</Translation>
+                  </dt>
+                  <dd title={projectDetails.description}>{projectDetails.description}</dd>
+                </div>
+              )}
+            </dl>
+          </div>
+          <nav className="project-tabs" role="tablist">
+            {menu}
+          </nav>
+        </div>
         {this.props.children}
       </Fragment>
     );

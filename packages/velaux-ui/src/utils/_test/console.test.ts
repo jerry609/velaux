@@ -5,7 +5,7 @@ import { closeTab, openTab, tabFor } from '../../layout/RecentTabs/tabs';
 import type { Tab } from '../../layout/RecentTabs/tabs';
 
 describe('splitLinks', () => {
-  type Link = { label: string; hidden?: boolean };
+  type Link = { label: string; hidden?: boolean; more?: boolean };
   const links = (n: number): Link[] => Array.from({ length: n }, (_, i) => ({ label: `l${i}` }));
 
   it('shows every link that fits, and a lone extra in place of More', () => {
@@ -23,6 +23,23 @@ describe('splitLinks', () => {
     const { shown, folded } = splitLinks<Link>([...links(3), { label: 'x', hidden: true }, { label: 'y' }], 3);
     expect(shown.map((l) => l.label)).to.deep.equal(['l0', 'l1', 'l2', 'y']);
     expect(folded).to.have.length(0);
+  });
+});
+
+describe('splitLinks with links that always fold', () => {
+  type Link = { label: string; more?: boolean };
+  const l = (label: string, more?: boolean): Link => ({ label, more });
+
+  it('folds a link marked more even when there is room', () => {
+    const { shown, folded } = splitLinks([l('a'), l('b'), l('long', true)], 2);
+    expect(shown.map((x) => x.label)).to.deep.equal(['a', 'b']);
+    expect(folded.map((x) => x.label)).to.deep.equal(['long']);
+  });
+
+  it('folds the overflow before the marked links', () => {
+    const { shown, folded } = splitLinks([l('a'), l('b'), l('c'), l('long', true)], 2);
+    expect(shown.map((x) => x.label)).to.deep.equal(['a', 'b']);
+    expect(folded.map((x) => x.label)).to.deep.equal(['c', 'long']);
   });
 });
 

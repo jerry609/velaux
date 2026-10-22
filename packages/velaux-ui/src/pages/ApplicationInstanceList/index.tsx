@@ -1,4 +1,4 @@
-import { Table, Button, Message, Dialog, Card } from '@alifd/next';
+import { Table, Button, Message, Dialog } from '@alifd/next';
 import { connect } from 'dva';
 import { Link, routerRedux } from 'dva/router';
 import querystring from 'query-string';
@@ -8,9 +8,11 @@ import { deployApplication } from '../../api/application';
 import { notifyDeployed } from '../../utils/deploy';
 import { listApplicationPods, listCloudResources } from '../../api/observation';
 import { If } from '../../components/If';
+import { Panel, RowLinks, TablePager, pageOf } from '../../components/Console';
+import { StatusBadge } from '../../components/StatusBadge';
+import type { Tone } from '../../components/StatusBadge';
 import StatusShow from '../../components/StatusShow';
 import { Translation } from '../../components/Translation';
-import i18n from '../../i18n';
 import type {
   ApplicationComponent,
   ApplicationDeployResponse,
@@ -58,6 +60,17 @@ type State = {
   cloudInstance?: CloudInstance[];
   showStatus: boolean;
   deployLoading: boolean;
+  page: number;
+  pageSize: number;
+};
+
+// podTones colours a pod's phase as the badges do.
+const podTones: Record<string, Tone> = {
+  Running: 'healthy',
+  Pending: 'progressing',
+  Succeeded: 'neutral',
+  Failed: 'failed',
+  Unknown: 'neutral',
 };
 
 type CloudInstance = {
@@ -83,6 +96,8 @@ class ApplicationInstanceList extends React.Component<Props, State> {
       openRowKeys: [],
       showStatus: false,
       deployLoading: false,
+      page: 1,
+      pageSize: 10,
     };
   }
 
@@ -229,14 +244,6 @@ class ApplicationInstanceList extends React.Component<Props, State> {
   };
   getColumns = () => {
     const { applicationDetail, components } = this.props;
-    const getColor = (status: string) => {
-      switch (status) {
-        case 'Running':
-          return '#28a745';
-        default:
-          return '#000';
-      }
-    };
     const targets = this.getTargets();
     const targetMap = new Map<string, Target>();
     targets?.map((item) => {
@@ -292,7 +299,7 @@ class ApplicationInstanceList extends React.Component<Props, State> {
         title: <Translation>Status</Translation>,
         dataIndex: 'status.phase',
         cell: (v: string) => {
-          return <span style={{ color: getColor(v) }}>{v}</span>;
+          return <StatusBadge tone={podTones[v] || 'neutral'} label={v || '-'} />;
         },
       },
       {
@@ -333,6 +340,38 @@ class ApplicationInstanceList extends React.Component<Props, State> {
               <div>{record.status.nodeName}</div>
               <div>{record.status.hostIP}</div>
             </div>
+          );
+        },
+      },
+      {
+        key: 'actions',
+        title: <Translation>Actions</Translation>,
+        dataIndex: 'primaryKey',
+        width: 160,
+        lock: 'right',
+        cell: (v: string) => {
+          const open = (this.state.openRowKeys as string[]).includes(v);
+          return (
+            <RowLinks
+              links={[
+                {
+                  label: open ? 'Hide' : 'Details',
+                  onClick: () => {
+                    const keys = this.state.openRowKeys as string[];
+                    this.onRowOpen(open ? keys.filter((k) => k !== v) : [...keys, v]);
+                  },
+                },
+                {
+                  label: 'Logs',
+                  onClick: () =>
+                    this.props.dispatch(
+                      routerRedux.push(
+                        `/applications/${applicationDetail?.name}/envbinding/${this.props.match.params.envName}/logs`
+                      )
+                    ),
+                },
+              ]}
+            />
           );
         },
       },
@@ -442,7 +481,9 @@ class ApplicationInstanceList extends React.Component<Props, State> {
 
   render() {
     const { applicationStatus, applicationDetail, components, userInfo } = this.props;
-    const { podList, loading, showStatus, cloudInstance, deployLoading } = this.state;
+    const { podList, loading, showStatus, cloudInstance, deployLoading, pageSize } = this.state;
+    // A refresh that shrinks the list keeps the page in range.
+    const page = Math.min(this.state.page, Math.max(1, Math.ceil((podList || []).length / pageSize)));
     const columns = this.getColumns();
     const envbinding = this.getEnvbindingByName();
     const expandedRowRender = (record: PodBase) => {
@@ -487,15 +528,14 @@ class ApplicationInstanceList extends React.Component<Props, State> {
         />
         <If condition={applicationStatus}>
           <If condition={!onlyShowCloudInstance}>
-            <div style={{ overflow: 'auto' }}>
+            <div className="console-panel pod-panel">
               <Table
-                style={{ marginBottom: '32px', minWidth: '1000px' }}
                 locale={locale().Table}
                 className="podlist-table-wrapper"
                 size="medium"
                 primaryKey={'primaryKey'}
                 loading={loading}
-                dataSource={podList || []}
+                dataSource={pageOf(podList || [], page, pageSize)}
                 expandedIndexSimulate
                 expandedRowRender={expandedRowRender}
                 openRowKeys={this.state.openRowKeys}
@@ -507,15 +547,20 @@ class ApplicationInstanceList extends React.Component<Props, State> {
                   <Column {...col} key={col.key} align={'left'} />
                 ))}
               </Table>
+              <TablePager
+                total={(podList || []).length}
+                page={page}
+                pageSize={pageSize}
+                onChange={(p, size) => this.setState({ page: p, pageSize: size })}
+              />
             </div>
           </If>
           <If condition={showCloudInstance}>
-            <Card title={i18n.t('Instances of the cloud service').toString()}>
-              <div style={{ overflow: 'auto' }}>
+            <Panel title="Instances of the cloud service" flush>
+              <div>
                 <Table
                   size="medium"
                   locale={locale().Table}
-                  style={{ minWidth: '1000px' }}
                   className="customTable"
                   dataSource={cloudInstance}
                   primaryKey={'instanceName'}
@@ -536,7 +581,12 @@ class ApplicationInstanceList extends React.Component<Props, State> {
                       return value;
                     }}
                   />
-                  <Column align="left" title={<Translation>Status</Translation>} dataIndex="status" />
+                  <Column
+                    align="left"
+                    title={<Translation>Status</Translation>}
+                    dataIndex="status"
+                    cell={(v: string) => <StatusBadge tone={v ? 'neutral' : 'undeployed'} label={v || '-'} />}
+                  />
                   <Column align="left" title={<Translation>Resource Type</Translation>} dataIndex="type" />
                   <Column
                     align="left"
@@ -551,12 +601,20 @@ class ApplicationInstanceList extends React.Component<Props, State> {
                     align="left"
                     title={<Translation>Actions</Translation>}
                     dataIndex="url"
+                    width={120}
+                    lock="right"
                     cell={(value: string, index: number, record: CloudInstance) => {
                       if (record.instanceName) {
                         return (
-                          <a target="_blank" href={value} rel="noopener noreferrer">
-                            <Translation>Console</Translation>
-                          </a>
+                          <RowLinks
+                            links={[
+                              {
+                                label: 'Console',
+                                disabled: !value,
+                                onClick: () => window.open(value, '_blank', 'noopener,noreferrer'),
+                              },
+                            ]}
+                          />
                         );
                       }
                       return;
@@ -564,7 +622,7 @@ class ApplicationInstanceList extends React.Component<Props, State> {
                   />
                 </Table>
               </div>
-            </Card>
+            </Panel>
           </If>
         </If>
         <If condition={!applicationStatus}>

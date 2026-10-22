@@ -14,6 +14,8 @@ export type RowLink = {
   reason?: string;
   danger?: boolean;
   hidden?: boolean;
+  // more folds the link under More whatever room there is.
+  more?: boolean;
 };
 
 type Props = {

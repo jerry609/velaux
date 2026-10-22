@@ -1,22 +1,25 @@
-import { Button, Dialog, Message, Pagination, Table } from '@alifd/next';
+import { Button, Dialog, Message, Table } from '@alifd/next';
+import { connect } from 'dva';
 import React, { Component, Fragment } from 'react';
-import { RowAction } from '../../components/RowAction';
-import { AiOutlineDelete, AiOutlineEdit } from 'react-icons/ai';
 
 import { getPlatformPermissions } from '../../api/rbac';
 import { deleteRole, getRoleList } from '../../api/roles';
 import { If } from '../../components/If';
 import { ListTitle as Title } from '../../components/ListTitle';
+import { ListToolbar, RowLinks, TablePager } from '../../components/Console';
 import Permission from '../../components/Permission';
 import { Translation } from '../../components';
-import type { PermissionBase, RolesBase } from '@velaux/data';
+import type { LoginUserInfo, PermissionBase, RolesBase } from '@velaux/data';
 import { momentDate } from '../../utils/common';
 import { locale } from '../../utils/locale';
+import { checkPermission } from '../../utils/permission';
 import './index.less';
 
 import RolesDialog from './components/RolesDialog';
 
-interface Props {}
+interface Props {
+  userInfo?: LoginUserInfo;
+}
 
 type State = {
   list: RolesBase[];
@@ -28,8 +31,13 @@ type State = {
   isEditRole: boolean;
   editRoleItem: RolesBase;
   isLoading: boolean;
+  // query narrows the loaded page by name or alias; the list call takes none.
+  query: string;
 };
 
+@connect((store: any) => {
+  return { ...store.user };
+})
 class Roles extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
@@ -43,6 +51,7 @@ class Roles extends Component<Props, State> {
       isEditRole: false,
       editRoleItem: { name: '' },
       isLoading: false,
+      query: '',
     };
   }
 
@@ -117,10 +126,11 @@ class Roles extends Component<Props, State> {
     });
   };
 
-  handleChange = (page: number) => {
+  handleChange = (page: number, pageSize: number) => {
     this.setState(
       {
         page,
+        pageSize,
       },
       () => {
         this.listRoles();
@@ -166,66 +176,64 @@ class Roles extends Component<Props, State> {
         key: 'operation',
         title: <Translation>Actions</Translation>,
         dataIndex: 'operation',
+        width: 160,
+        lock: 'right',
         cell: (v: string, i: number, record: RolesBase) => {
+          const may = (action: string) =>
+            checkPermission({ resource: `role:${record.name}`, action }, '', this.props.userInfo);
           return (
-            <Fragment>
-              <Permission request={{ resource: `role:${record.name}`, action: 'update' }} project={''}>
-                <RowAction
-                  icon={<AiOutlineEdit />}
-                  label="Edit"
-                  onClick={() => {
-                    this.onEdit(record);
-                  }}
-                />
-              </Permission>
-
-              <Permission request={{ resource: `role:${record.name}`, action: 'delete' }} project={''}>
-                <RowAction
-                  icon={<AiOutlineDelete />}
-                  label="Delete"
-                  danger
-                  onClick={() => {
-                    this.onDelete(record);
-                  }}
-                />
-              </Permission>
-            </Fragment>
+            <RowLinks
+              links={[
+                { label: 'Edit', hidden: !may('update'), onClick: () => this.onEdit(record) },
+                { label: 'Delete', danger: true, hidden: !may('delete'), onClick: () => this.onDelete(record) },
+              ]}
+            />
           );
         },
       },
     ];
 
     const { Column } = Table;
-    const { list, page, pageSize, total, visible, isEditRole, editRoleItem, permissions, isLoading } = this.state;
+    const { list, page, pageSize, total, visible, isEditRole, editRoleItem, permissions, isLoading, query } =
+      this.state;
+    const keyword = query.trim().toLowerCase();
+    const shown = keyword
+      ? list.filter((r) => r.name.toLowerCase().includes(keyword) || (r.alias || '').toLowerCase().includes(keyword))
+      : list;
     return (
       <Fragment>
         <div className="roles-list-content">
           <Title
             title="Platform Roles"
             subTitle="Assign permissions for resources such as clusters、targets、addons、projects and users"
-            extButtons={[
-              <Permission request={{ resource: 'role:*', action: 'create' }} project={''}>
-                <Button type="primary" onClick={this.handleClickCreate}>
-                  <Translation>New Role</Translation>
-                </Button>
-              </Permission>,
-            ]}
           />
-          <Table locale={locale().Table} dataSource={list} loading={isLoading}>
-            {columns.map((col, key) => (
-              <Column {...col} key={key} align={'left'} />
-            ))}
-          </Table>
-
-          <Pagination
-            className="margin-top-20 text-align-right"
-            total={total}
-            locale={locale().Pagination}
-            size="medium"
-            pageSize={pageSize}
-            current={page}
-            onChange={this.handleChange}
-          />
+          <div className="console-panel">
+            <div className="console-panel-body">
+              <ListToolbar
+                search={{
+                  value: query,
+                  placeholder: 'Search by name or alias',
+                  live: true,
+                  onSearch: (value: string) => this.setState({ query: value }),
+                }}
+                onRefresh={this.listRoles}
+                refreshing={isLoading}
+                actions={
+                  <Permission request={{ resource: 'role:*', action: 'create' }} project={''}>
+                    <Button type="primary" onClick={this.handleClickCreate}>
+                      <Translation>New Role</Translation>
+                    </Button>
+                  </Permission>
+                }
+              />
+            </div>
+            <Table locale={locale().Table} dataSource={shown} loading={isLoading} primaryKey="name">
+              {columns.map((col, key) => (
+                <Column {...col} key={key} align={'left'} />
+              ))}
+            </Table>
+            <TablePager total={total} page={page} pageSize={pageSize} onChange={this.handleChange} />
+          </div>
 
           <If condition={visible}>
             <RolesDialog

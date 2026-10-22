@@ -1,7 +1,7 @@
-import { Checkbox, Grid, Input, Select, } from '@alifd/next';
+import { Checkbox, Select } from '@alifd/next';
 import React from 'react';
-import { AiOutlineSearch } from 'react-icons/ai';
 
+import { ListToolbar } from '../../../../components/Console';
 import { Translation } from '../../../../components/Translation';
 import i18n from '../../../../i18n';
 import { locale } from '../../../../utils/locale';
@@ -21,6 +21,10 @@ type State = {
   inputValue: string;
 };
 
+const { Option } = Select;
+
+// SelectSearch is the catalog's toolbar: the name search and registry filter
+// at the left, refresh and the registries at the right, and the tags below.
 class SelectSearch extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
@@ -65,73 +69,57 @@ class SelectSearch extends React.Component<Props, State> {
   };
 
   render() {
-    const { Row, Col } = Grid;
-    const { Option } = Select;
     const { registries, extButtons } = this.props;
-    const queryPlaceholder = i18n.t('Search by Name and Description etc').toString();
     const { registryValue, inputValue } = this.state;
+    const tags = this.generateTagList();
 
     return (
-      <div className="border-radius-8 addon-search">
-        <div>
-          <Row wrap={true} gutter={12}>
-            <Col l={8} m={8} s={12} xxs={24}>
-              <Select
-                locale={locale().Select}
-                mode="single"
-                size="large"
-                onChange={this.handleChangRegistry}
-                className="item"
-                value={registryValue}
-              >
-                <Option value="">
-                  <Translation>All</Translation>
-                </Option>
-                {registries?.map((item: any) => {
-                  return (
-                    <Option key={item.name} value={item.name}>
-                      {item.name}
-                    </Option>
-                  );
-                })}
-              </Select>
-            </Col>
-
-            <Col l={8} m={8} s={12} xxs={24}>
-              <Input
-                innerAfter={<AiOutlineSearch onClick={this.handleClickSearch} style={{ margin: 4 }} />}
-                placeholder={queryPlaceholder}
-                size="large"
-                onChange={this.handleChangName}
-                onPressEnter={this.handleClickSearch}
-                value={inputValue}
-                className="item"
-              />
-            </Col>
-
-            <Col l={8} m={8} s={12} xxs={24}>
-              <div className={'ext-btn'} >
-                {extButtons &&
-                  extButtons.map((item) => {
-                    return item;
-                  })}
-              </div>
-            </Col>
-          </Row>
+      <div className="addon-search">
+        <ListToolbar
+          search={{
+            value: inputValue,
+            placeholder: 'Search by Name and Description etc',
+            onSearch: (value: string) => this.setState({ inputValue: value }, this.handleClickSearch),
+          }}
+          filters={
+            <Select
+              locale={locale().Select}
+              mode="single"
+              label={i18n.t('Registry').toString()}
+              onChange={this.handleChangRegistry}
+              className="addon-search-registry"
+              value={registryValue}
+            >
+              <Option value="">
+                <Translation>All</Translation>
+              </Option>
+              {registries?.map((item: any) => {
+                return (
+                  <Option key={item.name} value={item.name}>
+                    {item.name}
+                  </Option>
+                );
+              })}
+            </Select>
+          }
+          onRefresh={this.handleClickSearch}
+          actions={extButtons}
+        />
+        {tags.length > 0 && (
           <div className="tag-search">
             <div className="tag-name">
               <Translation>Tags</Translation>
             </div>
             <div className="tag-list">
               <Checkbox.Group
-                dataSource={this.generateTagList()}
+                dataSource={tags}
                 onChange={(tags) => {
                   this.props.onTagChange(tags);
                 }}
               />
             </div>
           </div>
-        </div>
+        )}
       </div>
     );
   }

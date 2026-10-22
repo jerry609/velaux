@@ -1,27 +1,30 @@
-import { Table, Button, Pagination, Message, Dialog } from '@alifd/next';
+import { Table, Button, Message, Dialog, Input } from '@alifd/next';
+import { connect } from 'dva';
 import React, { Component, Fragment } from 'react';
-import { RowAction } from '../../components/RowAction';
-import { AiOutlineCheckCircle, AiOutlineDelete, AiOutlineEdit, AiOutlineKey, AiOutlineStop } from 'react-icons/ai';
 
 import { getLoginType } from '../../api/authentication';
 import { getRoleList } from '../../api/roles';
 import { getUserList, deleteUser, changeUserDisable, changeUserEnable } from '../../api/users';
 import { If } from '../../components/If';
 import { ListTitle } from '../../components/ListTitle';
+import { ListToolbar, RowLinks, TablePager } from '../../components/Console';
 import Permission from '../../components/Permission';
 import { StatusBadge } from '../../components/StatusBadge';
 import { Translation } from '../../components/Translation';
-import type { NameAlias, RolesBase, User } from '@velaux/data';
+import type { LoginUserInfo, NameAlias, RolesBase, User } from '@velaux/data';
+import i18n from '../../i18n';
 import { momentDate } from '../../utils/common';
 import { locale } from '../../utils/locale';
+import { checkPermission } from '../../utils/permission';
 
 import CreateUser from './components/CreateUser';
 import ResetPassword from './components/ResetPassword';
-import SelectSearch from './components/SelectSearch';
 
 import './index.less';
 
-type Props = {};
+type Props = {
+  userInfo?: LoginUserInfo;
+};
 
 type State = {
   name: string;
@@ -42,6 +45,9 @@ type State = {
   dex: boolean;
 };
 
+@connect((store: any) => {
+  return { ...store.user };
+})
 class Users extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
@@ -246,10 +252,11 @@ class Users extends Component<Props, State> {
     });
   };
 
-  handleChange = (page: number) => {
+  handleChange = (page: number, pageSize: number) => {
     this.setState(
       {
         page,
+        pageSize,
       },
       () => {
         this.listUser();
@@ -328,54 +335,30 @@ class Users extends Component<Props, State> {
         key: 'operation',
         title: <Translation>Actions</Translation>,
         dataIndex: 'operation',
+        width: 260,
+        lock: 'right',
         cell: (v: string, i: number, record: User) => {
+          const may = (action: string) =>
+            checkPermission({ resource: `user:${record.name}`, action }, '', this.props.userInfo);
           return (
-            <Fragment>
-              <If condition={!this.state.dex}>
-                <Permission request={{ resource: `user:${record.name}`, action: 'update' }} project={''}>
-                  <RowAction
-                    icon={<AiOutlineKey />}
-                    label="Reset Password"
-                    onClick={() => {
-                      this.onResetPassword(record);
-                    }}
-                  />
-                </Permission>
-              </If>
-              <Permission request={{ resource: `user:${record.name}`, action: 'update' }} project={''}>
-                <RowAction
-                  icon={<AiOutlineEdit />}
-                  label="Edit"
-                  onClick={() => {
-                    this.onEdit(record);
-                  }}
-                />
-              </Permission>
-              <Permission
-                request={{
-                  resource: `user:${record.name}`,
-                  action: record.disabled ? 'enable' : 'disable',
-                }}
-                project={''}
-              >
-                <RowAction
-                  icon={record.disabled ? <AiOutlineCheckCircle /> : <AiOutlineStop />}
-                  label={record.disabled ? 'Enable' : 'Disable'}
-                  danger={!record.disabled}
-                  onClick={() => this.onChangeStatus(record)}
-                />
-              </Permission>
-              <Permission request={{ resource: `user:${record.name}`, action: 'delete' }} project={''}>
-                <RowAction
-                  icon={<AiOutlineDelete />}
-                  label="Delete"
-                  danger
-                  onClick={() => {
-                    this.onDelete(record);
-                  }}
-                />
-              </Permission>
-            </Fragment>
+            <RowLinks
+              links={[
+                { label: 'Edit', hidden: !may('update'), onClick: () => this.onEdit(record) },
+                {
+                  label: 'Reset Password',
+                  // Dex owns the passwords of users who sign in through it.
+                  hidden: this.state.dex || !may('update'),
+                  onClick: () => this.onResetPassword(record),
+                },
+                {
+                  label: record.disabled ? 'Enable' : 'Disable',
+                  danger: !record.disabled,
+                  hidden: !may(record.disabled ? 'enable' : 'disable'),
+                  onClick: () => this.onChangeStatus(record),
+                },
+                { label: 'Delete', danger: true, hidden: !may('delete'), onClick: () => this.onDelete(record) },
+              ]}
+            />
           );
         },
       },
@@ -400,75 +383,77 @@ class Users extends Component<Props, State> {
     return (
       <Fragment>
         <div className="user-wrapper">
-          <section>
-            <ListTitle
-              title="Users"
-              subTitle="Basic authorization management is provided for local users by default, but SSO authentication is strongly recommended"
-              extButtons={[
-                <Permission request={{ resource: 'user:*', action: 'create' }} project={''}>
-                  <Button type="primary" onClick={this.handleClickCreate}>
-                    <Translation>New User</Translation>
-                  </Button>
-                </Permission>,
-              ]}
-            />
-          </section>
+          <ListTitle
+            title="Users"
+            subTitle="Basic authorization management is provided for local users by default, but SSO authentication is strongly recommended"
+          />
 
-          <section>
-            <SelectSearch
-              name={name}
-              alias={alias}
-              email={email}
-              handleChangName={(nameValue: string) => {
-                this.handleChangName(nameValue);
-              }}
-              handleChangAlias={(aliasValue: string) => {
-                this.handleChangAlias(aliasValue);
-              }}
-              handleChangEmail={(emailValue: string) => {
-                this.handleChangEmail(emailValue);
-              }}
-            />
-          </section>
-
-          <section className="margin-top-20  user-list-wrapper">
-            <Table locale={locale().Table} dataSource={dataSource} loading={isLoading}>
+          <div className="console-panel user-list-wrapper">
+            <div className="console-panel-body">
+              <ListToolbar
+                search={{
+                  value: name,
+                  placeholder: 'Search by name',
+                  live: true,
+                  onSearch: (nameValue: string) => this.handleChangName(nameValue),
+                }}
+                filters={
+                  <Fragment>
+                    <Input
+                      hasClear
+                      className="user-filter"
+                      placeholder={i18n.t('Search by alias').toString()}
+                      onChange={(aliasValue: string) => this.handleChangAlias(aliasValue)}
+                      value={alias}
+                    />
+                    <Input
+                      hasClear
+                      className="user-filter"
+                      placeholder={i18n.t('Search by email').toString()}
+                      onChange={(emailValue: string) => this.handleChangEmail(emailValue)}
+                      value={email}
+                    />
+                  </Fragment>
+                }
+                onRefresh={this.listUser}
+                refreshing={isLoading}
+                actions={
+                  <Permission request={{ resource: 'user:*', action: 'create' }} project={''}>
+                    <Button type="primary" onClick={this.handleClickCreate}>
+                      <Translation>New User</Translation>
+                    </Button>
+                  </Permission>
+                }
+              />
+            </div>
+            <Table locale={locale().Table} dataSource={dataSource} loading={isLoading} primaryKey="name">
               {columns.map((col, key) => (
                 <Column {...col} key={key} align={'left'} />
               ))}
             </Table>
+            <TablePager total={total} page={page} pageSize={pageSize} onChange={this.handleChange} />
+          </div>
 
-            <Pagination
-              className="margin-top-20 text-align-right"
-              total={total}
-              locale={locale().Pagination}
-              size="medium"
-              pageSize={pageSize}
-              current={page}
-              onChange={this.handleChange}
+          <If condition={isUserDialogVisible}>
+            <CreateUser
+              visible={isUserDialogVisible}
+              isEditUser={isEditUser}
+              editUser={editUser}
+              rolesList={rolesList}
+              onClose={this.onClose}
+              onCreate={this.onCreate}
             />
+          </If>
 
-            <If condition={isUserDialogVisible}>
-              <CreateUser
-                visible={isUserDialogVisible}
-                isEditUser={isEditUser}
-                editUser={editUser}
-                rolesList={rolesList}
-                onClose={this.onClose}
-                onCreate={this.onCreate}
-              />
-            </If>
-
-            <If condition={isResetPasswordDialog}>
-              <ResetPassword
-                visible={isResetPasswordDialog}
-                editUser={editUser}
-                isResetPassword={isResetPassword}
-                onClose={this.onResetPassWordClose}
-                onCreate={this.onResetPassWord}
-              />
-            </If>
-          </section>
+          <If condition={isResetPasswordDialog}>
+            <ResetPassword
+              visible={isResetPasswordDialog}
+              editUser={editUser}
+              isResetPassword={isResetPassword}
+              onClose={this.onResetPassWordClose}
+              onCreate={this.onResetPassWord}
+            />
+          </If>
         </div>
       </Fragment>
     );

@@ -2,14 +2,14 @@ import { Button, Field, Loading, Message, Table } from '@alifd/next';
 import { connect } from 'dva';
 import { Link } from 'dva/router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AiOutlineDownload } from 'react-icons/ai';
+import { AiOutlineDownload, AiOutlineFileSearch, AiOutlineProject, AiOutlineTable } from 'react-icons/ai';
 import { HiOutlineRefresh } from 'react-icons/hi';
 
 import type { UIParam } from '@velaux/data';
 
 import { listReports, runReport } from '../../api/report';
+import { PageGuide, TablePager, pageOf } from '../../components/Console';
 import Empty from '../../components/Empty';
-import { ListTitle } from '../../components/ListTitle';
 import { recordStatus } from '../../components/PipelineGraph/status';
 import { StatusBadge } from '../../components/StatusBadge';
 import { Translation } from '../../components/Translation';
@@ -80,6 +80,8 @@ const ReportsView = (props: { currentProject?: { current: string; resolved: bool
   const [result, setResult] = useState<ReportResult>();
   const [failure, setFailure] = useState<string>();
   const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const track = useMemo(() => latestOnly(), []);
   const field = Field.useField();
   const form = useRef<UISchema>(null);
@@ -112,6 +114,7 @@ const ReportsView = (props: { currentProject?: { current: string; resolved: bool
         .then((res: any) => {
           if (res?.report) {
             setResult({ ...res, rows: res.rows || [] });
+            setPage(1);
           } else {
             setFailure(res?.Message || i18n.t('The report failed').toString());
           }
@@ -186,9 +189,27 @@ const ReportsView = (props: { currentProject?: { current: string; resolved: bool
 
   return (
     <div className="reports">
-      <ListTitle
+      <PageGuide
+        id="reports"
         title="Reports"
-        subTitle="Questions about the picked project, answered from its applications and namespaces."
+        description="Questions about the picked project, answered from its applications and namespaces."
+        steps={[
+          {
+            icon: <AiOutlineProject />,
+            title: 'Pick a project',
+            description: <Translation>Reports run over the project picked in the top bar</Translation>,
+          },
+          {
+            icon: <AiOutlineFileSearch />,
+            title: 'Pick a report',
+            description: <Translation>{"The project's own reports come first, then the global ones"}</Translation>,
+          },
+          {
+            icon: <AiOutlineTable />,
+            title: 'Run and export',
+            description: <Translation>Fill its parameters, read the result, and export it as CSV</Translation>,
+          },
+        ]}
       />
       {project === allProjects ? (
         <Empty
@@ -225,7 +246,12 @@ const ReportsView = (props: { currentProject?: { current: string; resolved: bool
                 )}
               </div>
               <div className="reports-result-actions">
-                <Button onClick={runWithParameters} title={i18n.t('Run again').toString()} disabled={!!report?.error}>
+                <Button
+                  className="list-toolbar-icon"
+                  onClick={runWithParameters}
+                  title={i18n.t('Run again').toString()}
+                  disabled={!!report?.error}
+                >
                   <HiOutlineRefresh />
                 </Button>
                 <Button onClick={download} disabled={!result || result.rows.length === 0}>
@@ -263,7 +289,7 @@ const ReportsView = (props: { currentProject?: { current: string; resolved: bool
             <Loading visible={loading} style={{ width: '100%' }}>
               {result?.stats && result.stats.length > 0 && <Stats stats={result.stats} />}
               {result?.chart && result.rows.length > 0 && <ReportChartView chart={result.chart} />}
-              <Table locale={locale().Table} dataSource={result?.rows || []}>
+              <Table locale={locale().Table} dataSource={pageOf(result?.rows || [], page, pageSize)}>
                 {(result?.columns || []).map((col) => (
                   <Table.Column
                     key={col.key}
@@ -275,6 +301,18 @@ const ReportsView = (props: { currentProject?: { current: string; resolved: bool
                   />
                 ))}
               </Table>
+              {result && result.rows.length > 0 && (
+                <TablePager
+                  total={result.rows.length}
+                  page={page}
+                  pageSize={pageSize}
+                  pageSizes={[20, 50, 100]}
+                  onChange={(p, size) => {
+                    setPage(p);
+                    setPageSize(size);
+                  }}
+                />
+              )}
             </Loading>
           </section>
         </div>

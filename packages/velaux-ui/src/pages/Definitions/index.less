@@ -1,25 +1,11 @@
 .definitions-list-content {
-  min-height: calc(100vh - 60px);
-  .next-table .next-table-header th .next-table-cell-wrapper {
-    display: flex;
-    justify-content: flex-start;
-  }
-
-  .next-table-cell.last .next-table-cell-wrapper {
-    text-align: left;
-    .next-btn-text {
-      padding-left: 0;
-    }
-  }
   .next-table-header-icon {
     margin-top: 2px;
   }
-  .enableStatus {
-    color: #20ad7e;
-  }
-  .disableStatus {
-    color: #f00;
-  }
+}
+
+.definitions-toolbar {
+  padding: 16px 20px 0;
 }
 
 .definition-name {
@@ -33,13 +19,13 @@
 }
 
 .definition-extends {
-  color: #8c8c8c;
+  color: var(--c-text-3);
   font-size: 12px;
 }
 
 .definition-overridden {
   display: block;
   margin-top: 2px;
-  color: #94a3b8;
+  color: var(--c-text-3);
   font-size: 12px;
 }

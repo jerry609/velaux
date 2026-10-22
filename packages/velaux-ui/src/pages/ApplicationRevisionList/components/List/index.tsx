@@ -1,9 +1,9 @@
-import { Balloon, Dialog, Dropdown, Menu, Message, Table } from '@alifd/next';
+import { Balloon, Dialog, Message, Table } from '@alifd/next';
+import { connect } from 'dva';
 
 import Empty from '../Empty';
 
 import { Link, routerRedux } from 'dva/router';
-import { AiOutlineDiff, AiOutlineFileSearch, AiOutlineRollback } from 'react-icons/ai';
 import React, { Component } from 'react';
 
 import './index.less';
@@ -12,9 +12,9 @@ import type { Dispatch } from 'redux';
 import { compareApplication, rollbackWithRevision } from '../../../../api/application';
 import { ApplicationDiff } from '../../../../components/ApplicationDiff';
 import { If } from '../../../../components/If';
+import { RowLinks } from '../../../../components/Console';
+import { StatusBadge } from '../../../../components/StatusBadge';
 import Item from '../../../../components/Item';
-import Permission from '../../../../components/Permission';
-import { RowAction } from '../../../../components/RowAction';
 import { Translation } from '../../../../components/Translation';
 import type {
   ApplicationCompareRequest,
@@ -22,11 +22,13 @@ import type {
   ApplicationDetail,
   ApplicationRevision,
   ApplicationRollbackResponse,
+  LoginUserInfo,
   NameAlias,
 } from '@velaux/data';
+import { checkPermission } from '../../../../utils/permission';
 import { momentDate, showAlias } from '../../../../utils/common';
 import { locale } from '../../../../utils/locale';
-import { statusList } from '../../constants';
+import { statusList, statusTones } from '../../constants';
 
 type Props = {
   list: ApplicationRevision[];
@@ -34,6 +36,7 @@ type Props = {
   applicationDetail?: ApplicationDetail;
   onShowAppModel: (record: ApplicationRevision) => void;
   dispatch: Dispatch<any>;
+  userInfo?: LoginUserInfo;
 };
 
 type State = {
@@ -43,6 +46,9 @@ type State = {
   diffMode: 'latest' | 'cluster';
 };
 
+@connect((store: any) => {
+  return { userInfo: store.user.userInfo };
+})
 class TableList extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
@@ -147,14 +153,7 @@ class TableList extends Component<Props, State> {
         cell: (v: string, i: number, record: ApplicationRevision) => {
           const findObj = statusList.find((item) => item.value === v);
           if (findObj) {
-            const show = (
-              <div>
-                {v === 'failure' && <span className="circle circle-failure" />}
-                {v === 'terminated' && <span className="circle circle-warning" />}
-                {v === 'complete' && <span className="circle circle-success" />}
-                <Translation>{findObj.label}</Translation>
-              </div>
-            );
+            const show = <StatusBadge tone={statusTones[v] || 'neutral'} label={findObj.label} />;
             if (record.reason) {
               return <Balloon trigger={show}>{record.reason}</Balloon>;
             }
@@ -194,53 +193,45 @@ class TableList extends Component<Props, State> {
         key: 'operation',
         title: <Translation>Actions</Translation>,
         dataIndex: 'operation',
+        width: 260,
+        lock: 'right',
         cell: (v: string, i: number, record: ApplicationRevision) => {
+          const project = applicationDetail?.project?.name;
+          const app = `project:${project}/application:${applicationDetail?.name}`;
+          const { userInfo } = this.props;
           return (
-            <div>
-              <Permission
-                project={applicationDetail?.project?.name}
-                request={{
-                  resource: `project:${applicationDetail?.project?.name}/application:${applicationDetail?.name}`,
-                  action: 'detail',
-                }}
-              >
-                <RowAction
-                  icon={<AiOutlineFileSearch />}
-                  label="Detail"
-                  onClick={() => this.props.onShowAppModel(record)}
-                />
-              </Permission>
-              <Dropdown trigger={<RowAction icon={<AiOutlineDiff />} label="Diff" />}>
-                <Menu>
-                  <Menu.Item
-                    onClick={() => {
-                      this.loadChanges(record, 'cluster');
-                    }}
-                  >
-                    <Translation>Diff With Deployed Application</Translation>
-                  </Menu.Item>
-                  <Menu.Item
-                    onClick={() => {
-                      this.loadChanges(record, 'latest');
-                    }}
-                  >
-                    <Translation>Diff With Latest Configuration</Translation>
-                  </Menu.Item>
-                </Menu>
-              </Dropdown>
-
-              <If condition={record.status === 'complete' || record.status == 'terminated'}>
-                <Permission
-                  project={applicationDetail?.project?.name}
-                  request={{
-                    resource: `project:${applicationDetail?.project?.name}/application:${applicationDetail?.name}/revision:${record.version}`,
-                    action: 'rollback',
-                  }}
-                >
-                  <RowAction icon={<AiOutlineRollback />} label="Rollback" onClick={() => this.onRollback(record)} />
-                </Permission>
-              </If>
-            </div>
+            <RowLinks
+              visible={2}
+              links={[
+                {
+                  label: 'Detail',
+                  hidden: !checkPermission({ resource: app, action: 'detail' }, project, userInfo),
+                  onClick: () => this.props.onShowAppModel(record),
+                },
+                {
+                  label: 'Rollback',
+                  hidden:
+                    !(record.status === 'complete' || record.status == 'terminated') ||
+                    !checkPermission(
+                      { resource: `${app}/revision:${record.version}`, action: 'rollback' },
+                      project,
+                      userInfo
+                    ),
+                  onClick: () => this.onRollback(record),
+                },
+                // The diffs' names are long, so they always sit under More.
+                {
+                  label: 'Diff With Deployed Application',
+                  more: true,
+                  onClick: () => this.loadChanges(record, 'cluster'),
+                },
+                {
+                  label: 'Diff With Latest Configuration',
+                  more: true,
+                  onClick: () => this.loadChanges(record, 'latest'),
+                },
+              ]}
+            />
           );
         },
       },
@@ -258,11 +249,10 @@ class TableList extends Component<Props, State> {
       targetName = 'Deployed Application';
     }
     return (
-      <div className="table-version-list  margin-top-20" style={{ overflow: 'auto' }}>
+      <div className="table-version-list">
         <Table
           locale={locale().Table}
           primaryKey={'version'}
-          style={{ minWidth: '1000px' }}
           className="customTable"
           rowHeight={40}
           dataSource={list}

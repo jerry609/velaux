@@ -5,6 +5,7 @@ import i18n from '../../../../i18n';
 import type { EnvBinding } from '@velaux/data';
 import { Translation } from '../../../../components/Translation';
 import { locale } from '../../../../utils/locale';
+import { ListToolbar } from '../../../../components/Console';
 
 interface Label {
   label: string;
@@ -15,6 +16,7 @@ type Props = {
   statusList: Label[];
   envBinding?: EnvBinding[];
   updateQuery: (params: { isChangeEnv?: boolean; isChangeStatus?: boolean; value: string }) => void;
+  onRefresh: () => void;
   dispatch?: ({}) => {};
 };
 
@@ -53,31 +55,36 @@ class Header extends React.Component<Props, State> {
       value: item.name,
     }));
     return (
-      <div className="app-tab-toolbar">
-        <Select
-          locale={locale().Select}
-          mode="single"
-          onChange={this.handleChangeEnv}
-          dataSource={envBinds}
-          label={i18n.t('Environment').toString()}
-          placeholder={i18n.t('All').toString()}
-          hasClear
-          value={envValue}
-        />
-        <Select
-          locale={locale().Select}
-          mode="single"
-          onChange={this.handleChangeStatus}
-          dataSource={statusList}
-          label={i18n.t('Status').toString()}
-          placeholder={i18n.t('All').toString()}
-          hasClear
-          value={statusValue}
-        />
-        <span className="app-tab-hint">
-          <Translation>Each deploy, and the configuration it deployed.</Translation>
-        </span>
-      </div>
+      <ListToolbar
+        filters={
+          <>
+            <Select
+              locale={locale().Select}
+              mode="single"
+              onChange={this.handleChangeEnv}
+              dataSource={envBinds}
+              label={i18n.t('Environment').toString()}
+              placeholder={i18n.t('All').toString()}
+              hasClear
+              value={envValue}
+            />
+            <Select
+              locale={locale().Select}
+              mode="single"
+              onChange={this.handleChangeStatus}
+              dataSource={statusList}
+              label={i18n.t('Status').toString()}
+              placeholder={i18n.t('All').toString()}
+              hasClear
+              value={statusValue}
+            />
+            <span className="app-tab-hint">
+              <Translation>Each deploy, and the configuration it deployed.</Translation>
+            </span>
+          </>
+        }
+        onRefresh={this.props.onRefresh}
+      />
     );
   }
 }

@@ -3,7 +3,8 @@ import { connect } from 'dva';
 import { routerRedux } from 'dva/router';
 import i18n from 'i18next';
 import React, { Component } from 'react';
-import { syncInfo } from '../../../../utils/appMeta';
+import { isDefaultDescription, syncInfo } from '../../../../utils/appMeta';
+import { momentDate } from '../../../../utils/common';
 import { Breadcrumb } from '../../../../components/Breadcrumb';
 import { StatusBadge } from '../../../../components/StatusBadge';
 import type { EnvironmentStatus } from '../../../../pages/ApplicationList/components/AppStatus/health';
@@ -166,21 +167,22 @@ class ApplicationHeader extends Component<Props, State> {
     const projectName = (applicationDetail && applicationDetail.project?.name) || '';
     return (
       <div>
-        <div className="app-head">
+        <div className="detail-head">
           <Breadcrumb
             items={[
+              { to: '/applications', title: <Translation>Applications</Translation> },
               {
                 to: '/projects/' + projectName + '/applications',
                 title: applicationDetail?.project?.alias || projectName,
               },
-              {
-                to: `/applications/${applicationDetail?.name || ''}`,
-                title: (applicationDetail && (applicationDetail.alias || applicationDetail.name)) || '',
-              },
+              { title: (applicationDetail && (applicationDetail.alias || applicationDetail.name)) || '' },
             ]}
           />
-          <div className="app-head-main">
-            <h1 className="app-head-name">{applicationDetail?.alias || applicationDetail?.name}</h1>
+          <div className="detail-head-main">
+            <h1 className="detail-head-name">{applicationDetail?.alias || applicationDetail?.name}</h1>
+            {applicationDetail?.alias && applicationDetail.alias !== applicationDetail.name && (
+              <span className="detail-head-id">{applicationDetail.name}</span>
+            )}
             <StatusBadge tone={summary.health} label={healthLabels[summary.health]} />
             {paused.length > 0 && (
               <StatusBadge
@@ -207,12 +209,7 @@ class ApplicationHeader extends Component<Props, State> {
                   .toString()}
               />
             )}
-            {summary.components > 0 && (
-              <span className="app-head-meta">
-                {summary.healthyComponents}/{summary.components} <Translation>components healthy</Translation>
-              </span>
-            )}
-            <div className="app-head-actions">
+            <div className="detail-head-actions">
               <Permission
                 request={{
                   resource: `project:${projectName}/application:${applicationDetail && applicationDetail.name}`,
@@ -226,6 +223,56 @@ class ApplicationHeader extends Component<Props, State> {
               </Permission>
             </div>
           </div>
+          <dl className="detail-head-facts">
+            <div>
+              <dt>
+                <Translation>Project</Translation>
+              </dt>
+              <dd>{applicationDetail?.project?.alias || projectName || '-'}</dd>
+            </div>
+            <div>
+              <dt>
+                <Translation>Components</Translation>
+              </dt>
+              <dd>
+                {summary.components > 0 ? (
+                  <span>
+                    {summary.healthyComponents}/{summary.components} <Translation>components healthy</Translation>
+                  </span>
+                ) : (
+                  applicationDetail?.resourceInfo?.componentNum ?? '-'
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt>
+                <Translation>Environments</Translation>
+              </dt>
+              <dd title={(applicationDetail?.envBindings || []).join(', ')}>
+                {(applicationDetail?.envBindings || []).length > 0 ? applicationDetail?.envBindings.join(', ') : '-'}
+              </dd>
+            </div>
+            <div>
+              <dt>
+                <Translation>Created</Translation>
+              </dt>
+              <dd>{momentDate(applicationDetail?.createTime) || '-'}</dd>
+            </div>
+            <div>
+              <dt>
+                <Translation>Updated</Translation>
+              </dt>
+              <dd>{momentDate(applicationDetail?.updateTime) || '-'}</dd>
+            </div>
+            {applicationDetail?.description && !isDefaultDescription(applicationDetail.description) && (
+              <div className="detail-head-wide">
+                <dt>
+                  <Translation>Description</Translation>
+                </dt>
+                <dd title={applicationDetail.description}>{applicationDetail.description}</dd>
+              </div>
+            )}
+          </dl>
         </div>
         <If condition={showDeployConfig}>
           {applicationDetail && envbinding && workflows && (
