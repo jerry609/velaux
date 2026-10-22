@@ -18,15 +18,14 @@ export const ListTitle = function (props: Props) {
 
   return (
     <div className="title-wrapper">
-      <div>
-        <span className="title font-size-20">
+      <div className="title-text">
+        <h1 className="title">
           <Translation>{title}</Translation>
-        </span>
-
+        </h1>
         {subTitle && (
-          <span className="subTitle font-size-14">
+          <p className="subTitle">
             <Translation>{subTitle}</Translation>
-          </span>
+          </p>
         )}
       </div>
 

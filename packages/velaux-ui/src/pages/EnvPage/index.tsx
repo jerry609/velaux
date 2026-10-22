@@ -1,19 +1,18 @@
-import { Pagination, Button } from '@alifd/next';
+import { Button } from '@alifd/next';
 import { projectChanged, scopedTo } from '../../utils/currentProject';
 import { connect } from 'dva';
 import React from 'react';
 
 import { If } from '../../components/If';
-import { ListTitle } from '../../components/ListTitle';
+import { ListToolbar, PageGuide, TablePager } from '../../components/Console';
 import Permission from '../../components/Permission';
 import { Translation } from '../../components/Translation';
 import type { Env, LoginUserInfo } from '@velaux/data';
-import { locale } from '../../utils/locale';
+import { Link } from 'dva/router';
+import { AiOutlineAim, AiOutlineCluster, AiOutlineDeploymentUnit } from 'react-icons/ai';
 
 import EnvDialog from './components/EnvDialog';
 import TableList from './components/List';
-
-import './index.less';
 
 type Props = {
   envTotal?: number;
@@ -31,6 +30,8 @@ type State = {
   visibleEnvDialog: boolean;
   isEdit: boolean;
   envItem?: Env;
+  // search filters the loaded page by name, alias or namespace.
+  search: string;
 };
 
 @connect((store: any) => {
@@ -46,6 +47,7 @@ class EnvList extends React.Component<Props, State> {
       editTargetName: '',
       visibleEnvDialog: false,
       isEdit: false,
+      search: '',
     };
   }
 
@@ -78,8 +80,7 @@ class EnvList extends React.Component<Props, State> {
   updateEnvList = () => {
     this.setState(
       {
-        page: 0,
-        pageSize: 10,
+        page: 1,
       },
       () => {
         this.getEnvList();
@@ -106,10 +107,11 @@ class EnvList extends React.Component<Props, State> {
     });
   };
 
-  handleChange = (page: number) => {
+  handleChange = (page: number, pageSize: number) => {
     this.setState(
       {
         page,
+        pageSize,
       },
       () => {
         this.getEnvList();
@@ -119,48 +121,96 @@ class EnvList extends React.Component<Props, State> {
 
   render() {
     const { envTotal, envs, userInfo } = this.props;
-    const { visibleEnvDialog, isEdit, envItem } = this.state;
+    const { visibleEnvDialog, isEdit, envItem, search } = this.state;
+    const keyword = search.trim().toLowerCase();
+    const list = scopedTo(envs, this.props.currentProject, (e: Env) => e.project?.name)?.filter(
+      (e: Env) => !keyword || [e.name, e.alias, e.namespace].some((v) => (v || '').toLowerCase().includes(keyword))
+    );
     return (
       <div>
-        <ListTitle
+        <PageGuide
+          id="environments"
           title="Environments"
-          subTitle="Set up the Environments for your Application based on Target sources"
-          extButtons={[
-            <Permission
-              key={'new-env'}
-              request={{ resource: 'project:?/environment:*', action: 'create' }}
-              project={'?'}
-            >
-              <Button
-                type="primary"
-                onClick={() => {
-                  this.setState({ visibleEnvDialog: true, envItem: undefined });
-                }}
-              >
-                <Translation>New Environment</Translation>
-              </Button>
-            </Permission>,
+          description="Set up the Environments for your Application based on Target sources"
+          steps={[
+            {
+              icon: <AiOutlineCluster />,
+              title: 'Prepare targets',
+              description: (
+                <Translation>Connect clusters, and create the targets an environment deploys to</Translation>
+              ),
+            },
+            {
+              icon: <AiOutlineAim />,
+              title: 'Create an environment',
+              description: <Translation>Give a project an environment, with its namespace and targets</Translation>,
+            },
+            {
+              icon: <AiOutlineDeploymentUnit />,
+              title: 'Use it in applications',
+              description: <Translation>Bind applications to it, and each deploys there on its own</Translation>,
+            },
           ]}
+          extra={
+            <div className="page-guide-links">
+              <Link to="/clusters">
+                <Translation>Clusters</Translation>
+              </Link>
+              <Link to="/targets">
+                <Translation>Targets</Translation>
+              </Link>
+              <Link to="/applications">
+                <Translation>Applications</Translation>
+              </Link>
+            </div>
+          }
         />
 
-        <TableList
-          list={scopedTo(envs, this.props.currentProject, (e: Env) => e.project?.name)}
-          updateEnvList={this.updateEnvList}
-          userInfo={userInfo}
-          changeISEdit={(is: boolean, record: Env) => {
-            this.changeISEdit(is, record);
-          }}
-        />
+        <div className="console-panel">
+          <div className="console-panel-body" style={{ paddingBottom: 4 }}>
+            <ListToolbar
+              search={{
+                value: search,
+                placeholder: 'Search by name or namespace',
+                live: true,
+                onSearch: (value: string) => this.setState({ search: value }),
+              }}
+              onRefresh={this.getEnvList}
+              actions={
+                <Permission
+                  key={'new-env'}
+                  request={{ resource: 'project:?/environment:*', action: 'create' }}
+                  project={'?'}
+                >
+                  <Button
+                    type="primary"
+                    onClick={() => {
+                      this.setState({ visibleEnvDialog: true, envItem: undefined });
+                    }}
+                  >
+                    <Translation>New Environment</Translation>
+                  </Button>
+                </Permission>
+              }
+            />
+          </div>
 
-        <Pagination
-          className="delivery-target-pagination"
-          total={envTotal}
-          locale={locale().Pagination}
-          size="medium"
-          pageSize={this.state.pageSize}
-          current={this.state.page}
-          onChange={this.handleChange}
-        />
+          <TableList
+            list={list}
+            updateEnvList={this.updateEnvList}
+            userInfo={userInfo}
+            changeISEdit={(is: boolean, record: Env) => {
+              this.changeISEdit(is, record);
+            }}
+          />
+
+          <TablePager
+            total={envTotal || 0}
+            page={this.state.page}
+            pageSize={this.state.pageSize}
+            onChange={this.handleChange}
+          />
+        </div>
 
         <If condition={visibleEnvDialog}>
           <EnvDialog

@@ -1,48 +1,54 @@
-.card-content-wrapper {
-  padding: 16px;
-  padding-bottom: 0;
-  border: none;
-  .next-card {
-    border: none;
-    border-radius: 8px;
+// The cluster table: its name beside the cluster's icon, the alias muted.
+.cluster-table {
+  overflow: auto;
+  border-top: 1px solid var(--c-divider);
+}
+
+.cluster-table-name {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  img {
+    flex: none;
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
   }
-  .next-card-show-divider .next-card-body {
-    padding: 0;
-  }
-  .content-wrapper {
-    padding: 20px 10px 0 10px;
-    background: #f7f6fb;
-    .content-title {
-      font-weight: 500;
-      font-size: 18px;
-    }
-    .content-main {
-      display: -webkit-box;
-      height: 70px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 2;
-    }
-    .content-foot {
-      padding: 16px 0 24px;
-    }
+  a,
+  .cluster-table-title {
+    font-weight: 600;
   }
 }
 
-.cluster-card-top {
-  height: 120px;
-  background: #ebf0ff;
-  img {
-    height: 60px;
-  }
+.cluster-table-alias {
+  margin-left: 8px;
+  color: var(--c-text-3);
+  font-size: 12px;
 }
-.dot-wrapper {
-  width: 100%;
-  .action {
-    float: right;
-    height: 24px;
-    color: #a6a6a6;
-    cursor: pointer;
-  }
+
+.cluster-table-labels {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.cluster-table-label {
+  padding: 0 6px;
+  color: var(--c-text-2);
+  font-size: 12px;
+  line-height: 20px;
+  background: var(--c-surface-2);
+  border: 1px solid var(--c-border);
+  border-radius: 2px;
+}
+
+.cluster-table-description {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.cluster-table-nowrap {
+  white-space: nowrap;
 }

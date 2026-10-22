@@ -2,12 +2,10 @@ import { ColumnProps } from '@alifd/next/types/table';
 import { Table, Message, Dialog, Tag } from '@alifd/next';
 import { Link } from 'dva/router';
 import React, { Component } from 'react';
-import { RowAction } from '../../../../components/RowAction';
-import { AiOutlineDelete, AiOutlineEdit } from 'react-icons/ai';
 
 import { deleteEnv } from '../../../../api/env';
 import { If } from '../../../../components/If';
-import Permission from '../../../../components/Permission';
+import { RowLinks } from '../../../../components/Console';
 import { Translation } from '../../../../components/Translation';
 import './index.less';
 import type { Env, NameAlias, Project, LoginUserInfo } from '@velaux/data';
@@ -35,11 +33,7 @@ class TableList extends Component<Props> {
     this.props.changeISEdit(true, record);
   };
 
-  showEnvAppList = (envName: string) => {
-    this.setState({ showEnvAppList: true, envName: envName });
-  };
-
-  getColumns = (): Array<ColumnProps & { key: string }> => {
+  getColumns = (): Array<ColumnProps & { key: string; lock?: string }> => {
     return [
       {
         key: 'name',
@@ -48,13 +42,10 @@ class TableList extends Component<Props> {
         width: '200px',
         cell: (v: string, i: number, env: Env) => {
           return (
-            <a
-              onClick={() => {
-                this.showEnvAppList(v);
-              }}
-            >
-              {`${env.name}(${env.alias || '-'})`}
-            </a>
+            <span>
+              <span className="env-table-name">{env.name}</span>
+              {env.alias && env.alias !== env.name && <span className="env-table-alias">{env.alias}</span>}
+            </span>
           );
         },
       },
@@ -129,49 +120,34 @@ class TableList extends Component<Props> {
         key: 'operation',
         title: <Translation>Actions</Translation>,
         dataIndex: 'operation',
-        width: '200px',
+        width: 160,
+        lock: 'right',
         cell: (v: string, i: number, record: Env) => {
+          const project = record.project.name;
+          const may = (action: string) =>
+            checkPermission(
+              { resource: `project:${project}/environment:${record.name}`, action },
+              project,
+              this.props.userInfo
+            );
           return (
-            <div>
-              <Permission
-                request={{
-                  resource: `project:${record.project.name}/environment:${record.name}`,
-                  action: 'update',
-                }}
-                project={record.project.name}
-              >
-                <RowAction
-                  icon={<AiOutlineEdit />}
-                  label="Edit"
-                  onClick={() => {
-                    this.onEdit(record);
-                  }}
-                />
-              </Permission>
-              <Permission
-                request={{
-                  resource: `project:${record.project.name}/environment:${record.name}`,
-                  action: 'delete',
-                }}
-                project={record.project.name}
-              >
-                <RowAction
-                  icon={<AiOutlineDelete />}
-                  label="Remove"
-                  danger
-                  onClick={() => {
+            <RowLinks
+              links={[
+                { label: 'Edit', hidden: !may('update'), onClick: () => this.onEdit(record) },
+                {
+                  label: 'Remove',
+                  danger: true,
+                  hidden: !may('delete'),
+                  onClick: () =>
                     Dialog.confirm({
                       type: 'confirm',
                       content: <Translation>Unrecoverable after deletion, are you sure to delete it?</Translation>,
-                      onOk: () => {
-                        this.onDelete(record);
-                      },
+                      onOk: () => this.onDelete(record),
                       locale: locale().Dialog,
-                    });
-                  }}
-                />
-              </Permission>
-            </div>
+                    }),
+                },
+              ]}
+            />
           );
         },
       },
@@ -183,15 +159,8 @@ class TableList extends Component<Props> {
     const columns = this.getColumns();
     const { list } = this.props;
     return (
-      <div className="table-env-list margin-top-20">
-        <Table
-          locale={locale().Table}
-          className="customTable"
-          size="medium"
-          style={{ minWidth: '1200px' }}
-          dataSource={list}
-          loading={false}
-        >
+      <div className="table-env-list">
+        <Table locale={locale().Table} size="medium" dataSource={list} primaryKey="name" loading={false}>
           {columns.map((col) => (
             <Column {...col} key={col.key} align={'left'} />
           ))}

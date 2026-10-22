@@ -1,15 +1,13 @@
-import { Table, Button, Dialog, Message, Tag, Balloon, Input, Select } from '@alifd/next';
+import { Table, Button, Dialog, Message, Tag, Balloon, Tab } from '@alifd/next';
 import { connect } from 'dva';
 import { routerRedux } from 'dva/router';
-import React, { Component, Fragment } from 'react';
-import { AiOutlineDelete, AiOutlineSearch, AiOutlineSend } from 'react-icons/ai';
-import { HiOutlineRefresh } from 'react-icons/hi';
+import React, { Component } from 'react';
+import { AiOutlineAppstore, AiOutlineForm, AiOutlineSend } from 'react-icons/ai';
 
 import { getConfigs, getProjectConfigs, deleteConfig, listTemplates } from '../../api/config';
 import Empty from '../../components/Empty';
-import { ListTitle } from '../../components/ListTitle';
+import { ListToolbar, PageGuide, RowLinks, TablePager, pageOf } from '../../components/Console';
 import Permission from '../../components/Permission';
-import { RowAction } from '../../components/RowAction';
 import { StatusBadge } from '../../components/StatusBadge';
 import { Translation } from '../../components/Translation';
 import i18n from '../../i18n';
@@ -17,10 +15,11 @@ import type { ConfigTemplate, Config, LoginUserInfo } from '@velaux/data';
 import { momentDate } from '../../utils/common';
 import { allProjects, projectChanged } from '../../utils/currentProject';
 import { locale } from '../../utils/locale';
+import { checkPermission } from '../../utils/permission';
 import DistributeConfigDialog from '../ProjectSummary/components/Configs/config-distribute';
 import CreateConfigDialog from './components/CreateConfigDialog';
 import { templateIcon } from './icons';
-import { templateFilterItems, templateOptions } from './templates';
+import { templateOptions } from './templates';
 import './index.less';
 
 type Props = {
@@ -44,6 +43,8 @@ type State = {
   // distribution is the legacy project config being distributed to targets.
   distribution?: Config;
   isLoading: boolean;
+  page: number;
+  pageSize: number;
 };
 
 // templateParam is the template a link to the list filters it to.
@@ -63,6 +64,8 @@ class Configs extends Component<Props, State> {
       template: templateParam(props.location?.search),
       query: '',
       isLoading: false,
+      page: 1,
+      pageSize: 10,
     };
   }
 
@@ -107,7 +110,7 @@ class Configs extends Component<Props, State> {
   // setTemplate filters the list, keeping the filter in the URL so it can be linked to.
   setTemplate = (template: string) => {
     const path = this.props.scope === 'project' ? '/project-configs' : '/configs';
-    this.setState({ template });
+    this.setState({ template, page: 1 });
     this.props.dispatch(routerRedux.replace(template ? `${path}?template=${template}` : path));
   };
 
@@ -133,23 +136,74 @@ class Configs extends Component<Props, State> {
 
   templateOf = (name: string) => this.state.templates.find((t) => t.name === name);
 
+  // rowLinks are a config's operations. In a project a shared config is the
+  // platform's, changed on the global page, so it has none here.
+  rowLinks = (record: Config) => {
+    const { userInfo } = this.props;
+    const inProject = this.props.scope === 'project';
+    const project = this.project();
+    const may = (action: string) =>
+      inProject
+        ? checkPermission({ resource: `project:${project}/config:${record.name}`, action }, project, userInfo)
+        : checkPermission({ resource: `config:${record.name}`, action }, '', userInfo);
+    if (inProject && record.shared) {
+      return <span className="row-list-muted">-</span>;
+    }
+    const viewable = !record.sensitive;
+    return (
+      <RowLinks
+        links={[
+          {
+            label: 'Details',
+            disabled: !viewable,
+            reason: 'Sensitive configs cannot be viewed',
+            onClick: () =>
+              this.setState({
+                open: {
+                  name: record.name,
+                  template: record.template?.name,
+                  templateNamespace: record.template?.namespace,
+                },
+              }),
+          },
+          {
+            label: 'Distribute',
+            hidden: !inProject || !record.legacy || !may('distribute'),
+            onClick: () => this.setState({ distribution: record }),
+          },
+          { label: 'Delete', danger: true, hidden: !may('delete'), onClick: () => this.onDelete(record) },
+        ]}
+      />
+    );
+  };
+
   render() {
     const { list, templates, template, query, open, isLoading, distribution } = this.state;
     const inProject = this.props.scope === 'project';
     const project = this.project();
     const q = query.trim().toLowerCase();
-    const shown = list.filter(
+    const matched = list.filter(
       (c) =>
-        (!template || c.template?.name === template) &&
-        (!q ||
-          [c.name, c.alias, c.description, c.template?.name, c.templateAlias].some((v) =>
-            (v || '').toLowerCase().includes(q)
-          ))
+        !q ||
+        [c.name, c.alias, c.description, c.template?.name, c.templateAlias].some((v) =>
+          (v || '').toLowerCase().includes(q)
+        )
     );
-    const templateLabel = (t: ConfigTemplate) => (
+    const shown = matched.filter((c) => !template || c.template?.name === template);
+    const { pageSize } = this.state;
+    // A filter that shrinks the list keeps the page in range.
+    const page = Math.min(this.state.page, Math.max(1, Math.ceil(shown.length / pageSize)));
+    // The tabs are the templates with configs, and the one the URL picks,
+    // each counting its configs the search leaves.
+    const tabs = templateOptions(templates, list).filter(
+      (o) => o.name === template || list.some((c) => c.template?.name === o.name)
+    );
+    const countOf = (name: string) => matched.filter((c) => c.template?.name === name).length;
+    const templateTab = (t: ConfigTemplate | { name: string; alias?: string }, count: number) => (
       <span className="config-template">
         <img src={templateIcon(t.name)} />
         {t.alias || t.name}
+        <span className="configs-tab-count">{count}</span>
       </span>
     );
     const columns = [
@@ -241,60 +295,44 @@ class Configs extends Component<Props, State> {
         key: 'operation',
         title: <Translation>Actions</Translation>,
         dataIndex: 'operation',
-        cell: (v: string, i: number, record: Config) =>
-          inProject ? (
-            // A shared config is the platform's: it is changed on the global page.
-            !record.shared && (
-              <Fragment>
-                {record.legacy && (
-                  <Permission
-                    request={{ resource: `project:${project}/config:${record.name}`, action: 'distribute' }}
-                    project={project}
-                  >
-                    <RowAction
-                      icon={<AiOutlineSend />}
-                      label="Distribute"
-                      onClick={() => this.setState({ distribution: record })}
-                    />
-                  </Permission>
-                )}
-                <Permission
-                  request={{ resource: `project:${project}/config:${record.name}`, action: 'delete' }}
-                  project={project}
-                >
-                  <RowAction icon={<AiOutlineDelete />} label="Delete" danger onClick={() => this.onDelete(record)} />
-                </Permission>
-              </Fragment>
-            )
-          ) : (
-            <Fragment>
-              <Permission request={{ resource: `config:${record.name}`, action: 'delete' }} project={''}>
-                <RowAction icon={<AiOutlineDelete />} label="Delete" danger onClick={() => this.onDelete(record)} />
-              </Permission>
-            </Fragment>
-          ),
+        width: 180,
+        lock: 'right',
+        cell: (v: string, i: number, record: Config) => this.rowLinks(record),
       },
     ];
     const { Column } = Table;
     return (
       <div className="list-content configs-list">
-        <ListTitle
+        <PageGuide
+          id={inProject ? 'project-configs' : 'configs'}
           title="Configs"
-          subTitle={
+          description={
             inProject
               ? "The project's configs, and the global ones shared with it"
               : 'Offering templated and extensible configuration management capabilities.'
           }
-          extButtons={[
-            <Permission
-              key="new"
-              request={{ resource: inProject ? `project:${project}/config:*` : `config:*`, action: 'create' }}
-              project={inProject ? project : ''}
-            >
-              <Button type="primary" onClick={() => this.setState({ open: { template: template || undefined } })}>
-                <Translation>New Config</Translation>
-              </Button>
-            </Permission>,
+          steps={[
+            {
+              icon: <AiOutlineAppstore />,
+              title: 'Pick a template',
+              description: (
+                <Translation>Choose what the config is for, such as an image registry or Helm repository</Translation>
+              ),
+            },
+            {
+              icon: <AiOutlineForm />,
+              title: 'Fill its properties',
+              description: (
+                <Translation>Enter the values the template asks for; sensitive ones stay hidden</Translation>
+              ),
+            },
+            {
+              icon: <AiOutlineSend />,
+              title: 'Distribute it',
+              description: (
+                <Translation>Share it with projects, or distribute it to clusters where it is used</Translation>
+              ),
+            },
           ]}
         />
         {inProject && project === allProjects ? (
@@ -302,40 +340,67 @@ class Configs extends Component<Props, State> {
             message={<Translation>Pick a project in the top bar. Each project has configs of its own.</Translation>}
           />
         ) : (
-          <>
-            <div className="configs-toolbar">
-              <Input
-                className="configs-search"
-                innerBefore={<AiOutlineSearch className="configs-search-icon" />}
-                placeholder={i18n.t('Search by name, alias, template or description').toString()}
-                value={query}
-                onChange={(value: string) => this.setState({ query: value })}
-                hasClear
+          <div className="console-panel">
+            <div className="console-panel-body configs-head">
+              <ListToolbar
+                search={{
+                  value: query,
+                  placeholder: 'Search by name, alias, template or description',
+                  live: true,
+                  onSearch: (value: string) => this.setState({ query: value, page: 1 }),
+                }}
+                onRefresh={() => this.listConfigs()}
+                refreshing={isLoading}
+                actions={
+                  <Permission
+                    key="new"
+                    request={{ resource: inProject ? `project:${project}/config:*` : `config:*`, action: 'create' }}
+                    project={inProject ? project : ''}
+                  >
+                    <Button type="primary" onClick={() => this.setState({ open: { template: template || undefined } })}>
+                      <Translation>New Config</Translation>
+                    </Button>
+                  </Permission>
+                }
               />
-              <Select
-                className="configs-template-filter"
-                label={i18n.t('Template').toString()}
-                placeholder={i18n.t('All').toString()}
-                value={template || undefined}
-                onChange={(value: string) => this.setTemplate(value || '')}
-                hasClear
-                locale={locale().Select}
-                dataSource={templateFilterItems(
-                  templateOptions(templates, list),
-                  inProject ? { project: i18n.t('Project').toString(), global: i18n.t('Global').toString() } : undefined
-                )}
-                itemRender={(item: any) => templateLabel({ name: item.value, alias: item.label } as ConfigTemplate)}
-              />
-              <Button onClick={() => this.listConfigs()} title={i18n.t('Refresh').toString()}>
-                <HiOutlineRefresh />
-              </Button>
+              <Tab
+                shape="pure"
+                excessMode="slide"
+                className="configs-tabs"
+                activeKey={template || ''}
+                onChange={(key: string | number) => this.setTemplate(String(key))}
+              >
+                <Tab.Item
+                  key=""
+                  title={
+                    <span>
+                      {i18n.t('All').toString()}
+                      <span className="configs-tab-count">{matched.length}</span>
+                    </span>
+                  }
+                />
+                {tabs.map((t) => (
+                  <Tab.Item key={t.name} title={templateTab(t, countOf(t.name))} />
+                ))}
+              </Tab>
             </div>
-            <Table locale={locale().Table} dataSource={shown} loading={isLoading}>
+            <Table
+              locale={locale().Table}
+              dataSource={pageOf(shown, page, pageSize)}
+              loading={isLoading}
+              primaryKey="name"
+            >
               {columns.map((col, key) => (
                 <Column {...col} key={key} align={'left'} />
               ))}
             </Table>
-          </>
+            <TablePager
+              total={shown.length}
+              page={page}
+              pageSize={pageSize}
+              onChange={(p, size) => this.setState({ page: p, pageSize: size })}
+            />
+          </div>
         )}
 
         {open && (

@@ -8,7 +8,6 @@ import { getProjectTargetList } from '../../api/project';
 import { If } from '../../components/If';
 import type { ApplicationBase, ApplicationQuery, LoginUserInfo } from '@velaux/data';
 import type { ShowMode } from '../ApplicationList';
-import { NewServiceDialog } from '../ApplicationList/components/NewServiceDialog';
 import CardContend from '../ApplicationList/components/CardContent';
 import EditAppDialog from '../ApplicationList/components/EditAppDialog';
 
@@ -33,7 +32,6 @@ type State = {
   targets?: [];
   envs?: [];
   isEditApplication: boolean;
-  isAddApplication: boolean;
   labelValue: string[];
   showMode: ShowMode;
 };
@@ -61,7 +59,6 @@ class ProjectApplications extends Component<Props, State> {
       envs: [],
       labelValue: [],
       isEditApplication: false,
-      isAddApplication: false,
       showMode: mode,
     };
   }
@@ -136,11 +133,10 @@ class ProjectApplications extends Component<Props, State> {
     });
   };
 
-  closeAddApplication = () => {
-    this.setState({
-      isAddApplication: false,
-    });
-    this.listApplication();
+  // addApplication opens the create page, its project fixed to this one.
+  addApplication = () => {
+    const { params = { projectName: '' } } = this.props.match;
+    this.props.history.push(`/applications/new?project=${encodeURIComponent(params.projectName)}`);
   };
 
   closeEditAppDialog = () => {
@@ -171,11 +167,9 @@ class ProjectApplications extends Component<Props, State> {
   };
 
   render() {
-    const { userInfo } = this.props;
     const {
       isLoading,
       applicationList,
-      isAddApplication,
       isEditApplication,
       editApplicationItem,
       targets,
@@ -209,9 +203,7 @@ class ProjectApplications extends Component<Props, State> {
             listApplication={(queryData: ApplicationQuery) => {
               this.listApplication(queryData);
             }}
-            onAddApplication={() => {
-              this.setState({ isAddApplication: true });
-            }}
+            onAddApplication={this.addApplication}
             setMode={(mode: ShowMode) => {
               this.setState({ showMode: mode });
               if (mode) {
@@ -231,21 +223,13 @@ class ProjectApplications extends Component<Props, State> {
               clickLabelFilter={this.clickLabelFilter}
               deleteAppPlan={this.onDeleteApplicationItem}
               setVisible={(visible) => {
-                this.setState({ isAddApplication: visible });
+                if (visible) {
+                  this.addApplication();
+                }
               }}
             />
           </Loading>
 
-          <If condition={isAddApplication}>
-            <NewServiceDialog
-              projects={userInfo?.projects}
-              project={projectName}
-              onClose={this.closeAddApplication}
-              onCreated={(name: string) => {
-                this.props.history.push(`/applications/${name}/config`);
-              }}
-            />
-          </If>
 
           <If condition={isEditApplication}>
             <EditAppDialog

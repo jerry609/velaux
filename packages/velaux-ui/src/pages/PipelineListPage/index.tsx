@@ -1,4 +1,4 @@
-import { ListTitle as Title } from '../../components/ListTitle';
+import { ListToolbar, PageGuide, RowLinks, TablePager, pageOf } from '../../components/Console';
 
 import { projectChanged } from '../../utils/currentProject';
 import { Loading, Button, Table, Dialog, Message, Balloon } from '@alifd/next';
@@ -6,8 +6,7 @@ import { connect } from 'dva';
 import { Link, routerRedux } from 'dva/router';
 import React, { Component } from 'react';
 import { RelativeTime } from '../../components/RelativeTime';
-import { RowAction } from '../../components/RowAction';
-import { AiOutlineCopy, AiOutlineDelete, AiOutlineEdit, AiOutlineHistory, AiOutlinePlayCircle } from 'react-icons/ai';
+import { AiOutlineHistory, AiOutlinePartition, AiOutlinePlusSquare } from 'react-icons/ai';
 import type { Dispatch } from 'redux';
 
 import { deletePipeline, listPipelines } from '../../api/pipeline';
@@ -29,12 +28,12 @@ import type {
 } from '@velaux/data';
 import { momentDate } from '../../utils/common';
 import { locale } from '../../utils/locale';
+import { checkPermission } from '../../utils/permission';
 import type { Tone } from '../../components/StatusBadge';
 import { StatusBadge } from '../../components/StatusBadge';
 
 import CreatePipeline from './components/CreatePipeline';
 import ClonePipeline from './components/PipelineClone';
-import SelectSearch from './components/SelectSearch';
 import ViewRuns from './components/ViewRuns';
 
 type Props = {
@@ -50,7 +49,9 @@ type State = {
   isLoading: boolean;
   editItem?: PipelineListItem;
   pipelines?: PipelineListItem[];
-  showMode: ShowMode;
+  query: string;
+  page: number;
+  pageSize: number;
   showRunPipeline?: boolean;
   pipeline?: PipelineListItem;
   showRuns?: boolean;
@@ -66,7 +67,9 @@ class PipelineListPage extends Component<Props, State> {
     super(props);
     this.state = {
       isLoading: false,
-      showMode: 'list',
+      query: '',
+      page: 1,
+      pageSize: 10,
     };
   }
 
@@ -85,8 +88,9 @@ class PipelineListPage extends Component<Props, State> {
     if (!this.props.currentProject?.resolved) {
       return;
     }
-    this.setState({ isLoading: true });
-    listPipelines({ query: params.query, projectName: this.props.currentProject.current })
+    const query = params.query ?? this.state.query;
+    this.setState({ isLoading: true, query, page: 1 });
+    listPipelines({ query, projectName: this.props.currentProject.current })
       .then((res) => {
         this.setState({
           pipelines: res && Array.isArray(res.pipelines) ? res.pipelines : [],
@@ -132,16 +136,57 @@ class PipelineListPage extends Component<Props, State> {
     this.setState({ showNewPipeline: true, pipeline: pipeline });
   };
 
+  // rowLinks are a pipeline's operations, each shown to those who may use it.
+  rowLinks = (pipeline: PipelineListItem) => {
+    const project = pipeline.project.name;
+    const may = (resource: string, action: string) =>
+      checkPermission({ resource: `project:${project}/${resource}`, action }, project, this.props.userInfo);
+    return (
+      <RowLinks
+        links={[
+          {
+            label: 'Run',
+            hidden: !may(`pipeline:${pipeline.name}`, 'run'),
+            onClick: () => this.onRunPipeline(pipeline),
+          },
+          {
+            label: 'View Runs',
+            hidden: !may(`pipeline:${pipeline.name}/pipelineRun:*`, 'list'),
+            onClick: () => this.onShowPipelineRuns(pipeline),
+          },
+          {
+            label: 'Edit',
+            hidden: !may(`pipeline:${pipeline.name}`, 'update'),
+            onClick: () => this.onEditPipeline(pipeline),
+          },
+          {
+            label: 'Clone',
+            hidden: !may('pipeline:*', 'create'),
+            onClick: () => this.onClonePipeline(pipeline),
+          },
+          {
+            label: 'Remove',
+            danger: true,
+            hidden: !may(`pipeline:${pipeline.name}`, 'delete'),
+            onClick: () => this.onDeletePipeline(pipeline),
+          },
+        ]}
+      />
+    );
+  };
+
   renderPipelineTable = () => {
-    const { pipelines } = this.state;
+    const pipelines = this.state.pipelines || [];
+    const { pageSize } = this.state;
+    const page = Math.min(this.state.page, Math.max(1, Math.ceil(pipelines.length / pageSize)));
     return (
       <div className="table-pipeline-list">
         <Table
           className="customTable"
           size="medium"
-          style={{ minWidth: '1400px' }}
           locale={locale().Table}
-          dataSource={pipelines}
+          dataSource={pageOf(pipelines, page, pageSize)}
+          primaryKey="name"
         >
           <Table.Column
             key={'name'}
@@ -255,137 +300,79 @@ class PipelineListPage extends Component<Props, State> {
             key={'actions'}
             title={i18n.t('Actions').toString()}
             dataIndex="name"
-            width={'420px'}
-            cell={(name: string, i: number, pipeline: PipelineListItem) => {
-              return (
-                <div>
-                  <Permission
-                    project={pipeline.project.name}
-                    resource={{
-                      resource: `project:${pipeline.project.name}/pipeline:${pipeline.name}`,
-                      action: 'run',
-                    }}
-                  >
-                    <RowAction
-                      icon={<AiOutlinePlayCircle />}
-                      label="Run"
-                      onClick={() => {
-                        this.onRunPipeline(pipeline);
-                      }}
-                    />
-                  </Permission>
-                  <Permission
-                    project={pipeline.project.name}
-                    resource={{
-                      resource: `project:${pipeline.project.name}/pipeline:${pipeline.name}/pipelineRun:*`,
-                      action: 'list',
-                    }}
-                  >
-                    <RowAction
-                      icon={<AiOutlineHistory />}
-                      label="View Runs"
-                      onClick={() => {
-                        this.onShowPipelineRuns(pipeline);
-                      }}
-                    />
-                  </Permission>
-                  <Permission
-                    project={pipeline.project.name}
-                    resource={{
-                      resource: `project:${pipeline.project.name}/pipeline:*`,
-                      action: 'create',
-                    }}
-                  >
-                    <RowAction
-                      icon={<AiOutlineCopy />}
-                      label="Clone"
-                      onClick={() => {
-                        this.onClonePipeline(pipeline);
-                      }}
-                    />
-                  </Permission>
-                  <Permission
-                    project={pipeline.project.name}
-                    resource={{
-                      resource: `project:${pipeline.project.name}/pipeline:${pipeline.name}`,
-                      action: 'update',
-                    }}
-                  >
-                    <RowAction
-                      icon={<AiOutlineEdit />}
-                      label="Edit"
-                      onClick={() => {
-                        this.onEditPipeline(pipeline);
-                      }}
-                    />
-                  </Permission>
-                  <Permission
-                    project={pipeline.project.name}
-                    resource={{
-                      resource: `project:${pipeline.project.name}/pipeline:${pipeline.name}`,
-                      action: 'delete',
-                    }}
-                  >
-                    <RowAction
-                      icon={<AiOutlineDelete />}
-                      label="Remove"
-                      danger
-                      onClick={() => {
-                        this.onDeletePipeline(pipeline);
-                      }}
-                    />
-                  </Permission>
-                </div>
-              );
-            }}
+            width={200}
+            lock="right"
+            cell={(name: string, i: number, pipeline: PipelineListItem) => this.rowLinks(pipeline)}
           />
         </Table>
+        <TablePager
+          total={pipelines.length}
+          page={page}
+          pageSize={pageSize}
+          onChange={(p, size) => this.setState({ page: p, pageSize: size })}
+        />
       </div>
     );
   };
 
   render() {
-    const { showMode, isLoading, showRunPipeline, pipeline, showRuns, showNewPipeline, showClonePipeline } = this.state;
+    const { query, isLoading, showRunPipeline, pipeline, showRuns, showNewPipeline, showClonePipeline } = this.state;
     const { enabledAddons } = this.props;
     const addonEnabled = enabledAddons?.filter((addon) => addon.name == 'vela-workflow').length;
     return (
       <div>
-        <Title
+        <PageGuide
+          id="pipelines"
           title="Pipelines"
-          subTitle="Orchestrate your multiple cloud native app release processes or model your cloud native pipeline."
-          extButtons={[
-            <Permission request={{ resource: 'project:?/pipeline:*', action: 'create' }} project={'?'}>
-              <If condition={addonEnabled}>
-                <Button
-                  type="primary"
-                  onClick={() => {
-                    this.setState({ showNewPipeline: true });
-                  }}
-                >
-                  <Translation>New Pipeline</Translation>
-                </Button>
-              </If>
-            </Permission>,
+          description="Orchestrate your multiple cloud native app release processes or model your cloud native pipeline."
+          steps={[
+            {
+              icon: <AiOutlinePlusSquare />,
+              title: 'Create a pipeline',
+              description: <Translation>Name it in a project, or clone one that exists</Translation>,
+            },
+            {
+              icon: <AiOutlinePartition />,
+              title: 'Configure its steps',
+              description: <Translation>Lay out its steps, their inputs and outputs in the studio</Translation>,
+            },
+            {
+              icon: <AiOutlineHistory />,
+              title: 'Run and watch',
+              description: <Translation>Run it with a context, then follow each run step by step</Translation>,
+            },
           ]}
         />
 
-        <SelectSearch
-          disableProject
-          showMode={showMode}
-          setMode={(mode: ShowMode) => {
-            this.setState({ showMode: mode });
-            if (mode) {
-              localStorage.setItem('application-list-mode', mode);
-            }
-          }}
-          getPipelines={(params: any) => {
-            this.getPipelines(params);
-          }}
-        />
         <If condition={addonEnabled}>
-          <Loading style={{ width: '100%' }} visible={isLoading}>
-            {this.renderPipelineTable()}
-          </Loading>
+          <div className="console-panel">
+            <div className="console-panel-body pipeline-toolbar">
+              <ListToolbar
+                search={{
+                  value: query,
+                  placeholder: 'Search by Name and Description etc',
+                  onSearch: (value: string) => this.getPipelines({ query: value }),
+                }}
+                onRefresh={() => this.getPipelines({})}
+                refreshing={isLoading}
+                actions={
+                  <Permission request={{ resource: 'project:?/pipeline:*', action: 'create' }} project={'?'}>
+                    <Button
+                      type="primary"
+                      onClick={() => {
+                        this.setState({ showNewPipeline: true });
+                      }}
+                    >
+                      <Translation>New Pipeline</Translation>
+                    </Button>
+                  </Permission>
+                }
+              />
+            </div>
+            <Loading style={{ width: '100%' }} visible={isLoading}>
+              {this.renderPipelineTable()}
+            </Loading>
+          </div>
         </If>
         <If condition={!addonEnabled}>
           <Permission request={{ resource: 'addon', action: 'enable' }}>

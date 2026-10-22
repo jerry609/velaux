@@ -1,146 +1,170 @@
-// The navigation reads as a quiet column: muted items, a soft tint on hover,
-// and the current page marked by a tinted pill with an accent bar.
-@nav-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+// The menu: foldable sections, each a list of items; the current page is
+// tinted with an accent bar on its left edge, as the cloud consoles mark it.
+
+.slide-wrapper {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font);
+  ul,
+  li {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+}
+
+.nav-container {
+  margin-bottom: 2px;
+  .main-nav {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    height: 36px;
+    padding: 0 14px 0 16px;
+    color: var(--sb-text-strong);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+    svg {
+      color: var(--sb-muted);
+    }
+    &:hover {
+      background: var(--sb-hover);
+    }
+    // A folded section holding the current page says so.
+    &.active .main-nav-text {
+      color: var(--sb-accent);
+    }
+  }
+  .main-nav-text {
+    flex: 1;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .main-nav-icon {
+    color: #f7ba1e !important;
+  }
+  .sub-wrapper {
+    padding-bottom: 4px;
+  }
+}
 
 .menu-item,
 .menu-item-active {
   position: relative;
-  display: block;
-  margin: 2px 12px;
-  padding: 9px 14px;
-  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 12px 0 28px;
+  color: var(--sb-text) !important;
+  font-size: 13px;
   transition: background-color 0.15s ease, color 0.15s ease;
   svg {
     flex: none;
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     color: var(--sb-muted);
-    transition: color 0.15s ease;
   }
-}
-
-.menu-item:hover {
-  color: var(--sb-text-strong) !important;
-  background-color: var(--sb-hover);
-  svg {
-    color: var(--sb-text-strong);
+  &:hover {
+    color: var(--sb-text-strong) !important;
+    text-decoration: none !important;
+    background-color: var(--sb-hover);
+    .menu-item-star {
+      visibility: visible;
+    }
   }
 }
 
 .menu-item-active {
   color: var(--sb-active-text) !important;
+  font-weight: 500;
   background-color: var(--sb-active);
   &::before {
     position: absolute;
-    top: 8px;
-    bottom: 8px;
-    left: -12px;
+    top: 0;
+    bottom: 0;
+    left: 0;
     width: 3px;
     background-color: var(--sb-accent);
-    border-radius: 0 3px 3px 0;
     content: '';
   }
   svg {
     color: var(--sb-accent);
   }
+  &:hover {
+    color: var(--sb-active-text) !important;
+    background-color: var(--sb-active);
+  }
 }
 
-.menu-item-icon {
-  width: 18px;
-  height: 18px;
+.menu-item-body {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
 }
 
 .menu-item-text {
-  flex: initial;
-  margin-left: 12px;
-  font-weight: 500;
-  font-size: 14px;
-  font-family: @nav-font;
-  line-height: 20px;
-  letter-spacing: 0.1px;
+  margin-left: 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.menu-item-text-active {
-  color: var(--sb-text-strong) !important;
-}
-
-a:hover {
-  text-decoration: none !important;
-}
-
-.menu-set {
-  &:hover {
-    &::before {
-      color: #000;
-    }
-  }
-  &::before {
-    color: #ccc;
-    font-size: 30px !important;
-  }
-}
-
-.slide-wrapper {
+// The star shows on hover, and stays on an item already starred.
+.menu-item-star {
   display: flex;
-  flex-direction: column;
-  font-family: @nav-font;
-  a:link {
-    color: var(--sb-text) !important;
-  }
-  ul,
-  li {
-    list-style: none;
-    a {
-      color: var(--sb-text);
-    }
-  }
-  .first-nav {
+  visibility: hidden;
+  padding: 2px;
+  cursor: pointer;
+  svg {
+    width: 14px;
+    height: 14px;
     color: var(--sb-muted);
   }
-  .nav-container {
-    color: var(--sb-muted);
-    .main-nav {
-      height: auto;
-      margin: 0 0 6px;
-      padding-left: 26px !important;
-      color: var(--sb-muted);
-      font-weight: 600;
-      font-size: 11px;
-      line-height: 16px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-    .sub-wrapper {
-      margin-bottom: 20px;
-    }
-  }
-  .ul-wrapper {
-    font-size: 14px;
-    ul {
-      font-size: 14px;
-    }
-    .remote,
-    .next-icon.next-medium::before {
-      font-size: 15px;
+  &.on {
+    visibility: visible;
+    svg {
+      color: #f7ba1e;
     }
   }
 }
 
-.bottom {
-  position: absolute;
-  bottom: 10px;
-  padding-left: 32px;
-  cursor: pointer;
-  p {
-    color: #fff;
+.collapsed {
+  .menu-item,
+  .menu-item-active {
+    justify-content: center;
+    padding: 0;
   }
+  .menu-item-text {
+    display: none;
+  }
+  .menu-item-body {
+    flex: none;
+  }
+  .nav-container + .nav-container {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--sb-border);
+  }
+}
+
+.menu-empty {
+  padding: 16px;
+  color: var(--sb-muted);
+  font-size: 12px;
+  text-align: center;
 }
 
 // An item not built yet: greyed out, leading nowhere.
 .menu-item-coming-soon {
-  display: block;
   cursor: default;
   opacity: 0.45;
+  &:hover {
+    background: transparent;
+  }
 }
 
 .menu-item-hint-name {

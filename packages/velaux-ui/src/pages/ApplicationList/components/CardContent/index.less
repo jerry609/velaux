@@ -56,8 +56,8 @@
 .app-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(432px, 1fr));
-  gap: 20px;
-  padding: 20px 0;
+  gap: 16px;
+  padding: 4px 20px 20px;
 }
 
 // An application card, its left edge in the colour of its health.
@@ -192,8 +192,8 @@
 
 // The table view; the table itself takes the page's card style.
 .app-table {
-  margin-top: 20px;
   overflow: auto;
+  border-top: 1px solid var(--c-divider);
   .app-table-nowrap {
     white-space: nowrap;
   }

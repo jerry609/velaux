@@ -1,23 +1,27 @@
 import { Table, Message, Dialog } from '@alifd/next';
 import React, { Component } from 'react';
-import { RowAction } from '../../../../components/RowAction';
-import { AiOutlineDelete, AiOutlineEdit } from 'react-icons/ai';
+import { connect } from 'dva';
 
 import { deleteTarget } from '../../../../api/target';
-import Permission from '../../../../components/Permission';
+import { RowLinks } from '../../../../components/Console';
 import { Translation } from '../../../../components/Translation';
 import './index.less';
-import type { Project, Target } from '@velaux/data';
+import type { LoginUserInfo, Project, Target } from '@velaux/data';
 import { locale } from '../../../../utils/locale';
+import { checkPermission } from '../../../../utils/permission';
 
 import { Link } from 'dva/router';
 
 type Props = {
   list?: Target[];
+  userInfo?: LoginUserInfo;
   updateTargetList: () => void;
   changeISEdit: (param: boolean, record: Target) => void;
 };
 
+@connect((store: any) => {
+  return { ...store.user };
+})
 class TableList extends Component<Props> {
   onDelete = (record: Target) => {
     deleteTarget({ name: record.name || '' }).then((re) => {
@@ -39,7 +43,7 @@ class TableList extends Component<Props> {
         title: <Translation>Name</Translation>,
         dataIndex: 'name',
         cell: (v: string) => {
-          return <span>{v}</span>;
+          return <span className="target-table-name">{v}</span>;
         },
       },
       {
@@ -86,37 +90,29 @@ class TableList extends Component<Props> {
         key: 'operation',
         title: <Translation>Actions</Translation>,
         dataIndex: 'operation',
-        width: '200px',
+        width: 160,
+        lock: 'right',
         cell: (v: string, i: number, record: Target) => {
+          const may = (action: string) =>
+            checkPermission({ resource: `target:${record.name}`, action }, '', this.props.userInfo);
           return (
-            <div>
-              <Permission request={{ resource: `target:${record.name}`, action: 'update' }} project={''}>
-                <RowAction
-                  icon={<AiOutlineEdit />}
-                  label="Edit"
-                  onClick={() => {
-                    this.onEdit(record);
-                  }}
-                />
-              </Permission>
-              <Permission request={{ resource: `target:${record.name}`, action: 'delete' }} project={''}>
-                <RowAction
-                  icon={<AiOutlineDelete />}
-                  label="Remove"
-                  danger
-                  onClick={() => {
+            <RowLinks
+              links={[
+                { label: 'Edit', hidden: !may('update'), onClick: () => this.onEdit(record) },
+                {
+                  label: 'Remove',
+                  danger: true,
+                  hidden: !may('delete'),
+                  onClick: () =>
                     Dialog.confirm({
                       type: 'confirm',
                       content: <Translation>Unrecoverable after deletion, are you sure to delete it?</Translation>,
-                      onOk: () => {
-                        this.onDelete(record);
-                      },
+                      onOk: () => this.onDelete(record),
                       locale: locale().Dialog,
-                    });
-                  }}
-                />
-              </Permission>
-            </div>
+                    }),
+                },
+              ]}
+            />
           );
         },
       },
@@ -128,15 +124,8 @@ class TableList extends Component<Props> {
     const columns = this.getColumns();
     const { list } = this.props;
     return (
-      <div className="table-delivery-list margin-top-20">
-        <Table
-          locale={locale().Table}
-          className="customTable"
-          size="medium"
-          style={{ minWidth: '1200px' }}
-          dataSource={list}
-          loading={false}
-        >
+      <div className="table-delivery-list">
+        <Table locale={locale().Table} size="medium" dataSource={list} primaryKey="name" loading={false}>
           {columns.map((col) => (
             <Column {...col} key={col.key} align={'left'} />
           ))}

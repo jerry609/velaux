@@ -1,15 +1,39 @@
-.shared-workflow-list {
-  --row-columns: minmax(220px, 1.6fr) 170px minmax(220px, 1.4fr) minmax(140px, 1fr) 110px;
-  .row-list-name {
-    color: inherit;
+.shared-workflows .studio-settings-sep {
+  margin: 0 4px;
+}
+
+// The toolbar sits in the panel's head, above the table.
+.shared-toolbar {
+  padding-bottom: 0;
+  .list-toolbar {
+    margin-bottom: 16px;
   }
-  .studio-settings-sep {
-    margin: 0 4px;
+}
+
+.shared-name {
+  display: inline-flex;
+  gap: 10px;
+  align-items: flex-start;
+  color: inherit !important;
+  .row-list-icon {
+    flex: none;
+    margin-top: 3px;
+    color: var(--c-text-3);
+  }
+  .row-list-title {
+    display: block;
+    color: var(--c-primary);
+    font-weight: 500;
+  }
+  .row-list-type {
+    display: block;
+    color: var(--c-text-3);
+    font-size: 12px;
   }
 }
 
 .shared-hidden .row-list-title {
-  color: #94a3b8;
+  color: #94a3b8 !important;
 }
 
 .shared-hidden-note {
@@ -19,7 +43,10 @@
 }
 
 .shared-notice {
-  padding: 8px 16px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: #fff7e8;
+  border-radius: var(--radius);
   color: #9a3412;
   font-size: 13px;
 }

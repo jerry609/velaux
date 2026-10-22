@@ -12,6 +12,7 @@ import ApplicationConfig from '../../pages/ApplicationConfig';
 import ApplicationEnvRoute from '../../pages/ApplicationEnvRoute';
 import ApplicationInstanceList from '../../pages/ApplicationInstanceList';
 import Application from '../../pages/ApplicationList';
+import NewApplication from '../../pages/NewApplication';
 import ApplicationLog from '../../pages/ApplicationLog';
 import ApplicationYaml from '../../pages/ApplicationYaml';
 import ApplicationEnvironments from '../../pages/ApplicationEnvironments';
@@ -71,6 +72,13 @@ export default function Router() {
         path="/applications"
         render={(props: any) => {
           return <Application {...props} />;
+        }}
+      />
+      <Route
+        exact
+        path="/applications/new"
+        render={(props: any) => {
+          return <NewApplication {...props} />;
         }}
       />
       <Route

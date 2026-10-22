@@ -9,16 +9,20 @@ type Props = {
   danger?: boolean;
 };
 
-// RowAction is one of a row's actions, as an icon button named by its tooltip.
+// RowAction is one of a row's actions, as a text link in the operations
+// column, the way the cloud consoles list them. The icon is kept for callers
+// that still pass one, but the label is what shows.
 // It forwards its ref and any other props, so it can be a Dropdown's trigger.
 export const RowAction = React.forwardRef<HTMLButtonElement, Props & React.ButtonHTMLAttributes<HTMLButtonElement>>(
   (props, ref) => {
-    const { icon, label: key, danger, className: extra, ...rest } = props;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { icon, label: key, danger, className: extra, children, ...rest } = props;
     const label = i18n.t(key).toString();
     const className = `row-action ${danger ? 'danger' : ''} ${extra || ''}`;
     return (
-      <button ref={ref} type="button" title={label} aria-label={label} {...rest} className={className}>
-        {icon}
+      <button ref={ref} type="button" {...rest} className={className}>
+        {label}
+        {children}
       </button>
     );
   }

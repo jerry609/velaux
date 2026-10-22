@@ -1,19 +1,18 @@
-import { Pagination, Button } from '@alifd/next';
+import { Button } from '@alifd/next';
 import { projectChanged, scopedTo } from '../../utils/currentProject';
 import { connect } from 'dva';
 import React from 'react';
 
 import { If } from '../../components/If';
-import { ListTitle } from '../../components/ListTitle';
+import { ListToolbar, PageGuide, TablePager } from '../../components/Console';
 import Permission from '../../components/Permission';
 import { Translation } from '../../components/Translation';
 import type { Cluster, Target, LoginUserInfo } from '@velaux/data';
-import { locale } from '../../utils/locale';
+import { Link } from 'dva/router';
+import { AiOutlineAim, AiOutlineCluster, AiOutlineDeploymentUnit } from 'react-icons/ai';
 
 import TableList from './components/List';
 import TargetDialog from './components/TargetDialog';
-
-import './index.less';
 
 type Props = {
   targets?: Target[];
@@ -44,7 +43,7 @@ class TargetList extends React.Component<Props, State> {
     this.state = {
       query: '',
       page: 1,
-      pageSize: 5,
+      pageSize: 10,
       showAddTarget: false,
       editTargetName: '',
       visibleDelivery: false,
@@ -90,8 +89,7 @@ class TargetList extends React.Component<Props, State> {
     this.setState(
       {
         query: '',
-        page: 0,
-        pageSize: 10,
+        page: 1,
       },
       () => {
         this.getTargetList();
@@ -118,10 +116,11 @@ class TargetList extends React.Component<Props, State> {
     });
   };
 
-  handleChange = (page: number) => {
+  handleChange = (page: number, pageSize: number) => {
     this.setState(
       {
         page,
+        pageSize,
       },
       () => {
         this.getTargetList();
@@ -129,45 +128,91 @@ class TargetList extends React.Component<Props, State> {
     );
   };
 
+  // search finds targets by name from the first page.
+  search = (query: string) => {
+    this.setState({ query, page: 1 }, () => {
+      this.getTargetList();
+    });
+  };
+
   render() {
     const { clusterList, targets, total } = this.props;
     const { visibleDelivery, isEdit, targetItem } = this.state;
     return (
       <div>
-        <ListTitle
+        <PageGuide
+          id="targets"
           title="Targets"
-          subTitle="Define the targets that applications would deliver to"
-          extButtons={[
-            <Permission key={'new-target'} request={{ resource: 'target:*', action: 'create' }} project={''}>
-              <Button
-                type="primary"
-                onClick={() => {
-                  this.setState({ visibleDelivery: true, targetItem: undefined });
-                }}
-              >
-                <Translation>New Target</Translation>
-              </Button>
-            </Permission>,
+          description="Define the targets that applications would deliver to"
+          steps={[
+            {
+              icon: <AiOutlineCluster />,
+              title: 'Prepare a cluster',
+              description: <Translation>Connect the cluster the target points at</Translation>,
+            },
+            {
+              icon: <AiOutlineAim />,
+              title: 'Create a target',
+              description: <Translation>Name a cluster and a namespace in it, for a project</Translation>,
+            },
+            {
+              icon: <AiOutlineDeploymentUnit />,
+              title: 'Use it in applications',
+              description: (
+                <Translation>Add it to an environment, and the applications there deliver to it</Translation>
+              ),
+            },
           ]}
+          extra={
+            <div className="page-guide-links">
+              <Link to="/clusters">
+                <Translation>Clusters</Translation>
+              </Link>
+              <Link to="/envs">
+                <Translation>Environments</Translation>
+              </Link>
+              <Link to="/applications">
+                <Translation>Applications</Translation>
+              </Link>
+            </div>
+          }
         />
 
-        <TableList
-          list={scopedTo<Target>(targets, this.props.currentProject, (t: Target) => t.project?.name)}
-          updateTargetList={this.updateTargetList}
-          changeISEdit={(is: boolean, record: Target) => {
-            this.changeISEdit(is, record);
-          }}
-        />
+        <div className="console-panel">
+          <div className="console-panel-body" style={{ paddingBottom: 4 }}>
+            <ListToolbar
+              search={{ value: this.state.query, placeholder: 'Search by name', onSearch: this.search }}
+              onRefresh={this.getTargetList}
+              actions={
+                <Permission key={'new-target'} request={{ resource: 'target:*', action: 'create' }} project={''}>
+                  <Button
+                    type="primary"
+                    onClick={() => {
+                      this.setState({ visibleDelivery: true, targetItem: undefined });
+                    }}
+                  >
+                    <Translation>New Target</Translation>
+                  </Button>
+                </Permission>
+              }
+            />
+          </div>
 
-        <Pagination
-          className="delivery-target-pagination"
-          total={total}
-          locale={locale().Pagination}
-          size="medium"
-          pageSize={this.state.pageSize}
-          current={this.state.page}
-          onChange={this.handleChange}
-        />
+          <TableList
+            list={scopedTo<Target>(targets, this.props.currentProject, (t: Target) => t.project?.name)}
+            updateTargetList={this.updateTargetList}
+            changeISEdit={(is: boolean, record: Target) => {
+              this.changeISEdit(is, record);
+            }}
+          />
+
+          <TablePager
+            total={total || 0}
+            page={this.state.page}
+            pageSize={this.state.pageSize}
+            onChange={this.handleChange}
+          />
+        </div>
 
         <If condition={visibleDelivery}>
           <TargetDialog

@@ -349,6 +349,8 @@ export interface MenuService {
   loadPluginMenus(): Promise<Menu[]>;
 
   resetPluginMenus(): void;
+
+  findMenu(path: string): Menu | undefined;
 }
 
 /** @internal */
@@ -401,6 +403,20 @@ export class MenuWrapper implements MenuService {
     this.menus = _.cloneDeep(defaultWorkspaceMenus);
     this.workspaces = _.cloneDeep(defaultWorkspaces);
   };
+  // findMenu is the menu whose page holds a path, the deepest when several do.
+  findMenu(path: string): Menu | undefined {
+    let found: Menu | undefined;
+    this.menus.forEach((m) => {
+      if (!m.to || !(path === m.to || path.startsWith(m.to + '/'))) {
+        return;
+      }
+      if (!found || m.to.length > (found.to || '').length) {
+        found = m;
+      }
+    });
+    return found;
+  }
+
   getWorkspace(name: string): Workspace | undefined {
     return this.workspaces.find((w) => w.name == name);
   }

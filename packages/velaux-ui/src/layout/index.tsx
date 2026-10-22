@@ -1,10 +1,9 @@
 import { ConfigProvider } from '@alifd/next';
 import React, { useEffect, useState } from 'react';
 import LayoutRouter from './LayoutRouter';
-import LeftMenu from './LeftMenu';
 import Header from './Header';
-import { ProjectPicker } from '../components/ProjectPicker';
-import QuickSearch from '../components/QuickSearch';
+import { Sidebar } from './Sidebar';
+import { RecentTabs } from './RecentTabs';
 import './index.less';
 import { LayoutMode, LayoutModes, Workspace } from '@velaux/data';
 import { locationService } from '../services/LocationService';
@@ -56,28 +55,16 @@ export default function MainLayout(props: any) {
           }
           return (
             <div className="layout">
-              {mode !== LayoutModes.NeatPro && (
-                <Header
-                  currentWorkspace={workspace}
-                  mode={mode}
-                  collapsed={collapsed || mode === LayoutModes.Neat}
-                  onToggleCollapsed={toggleCollapsed}
-                  {...props}
-                >
-                  <LeftMenu {...props} collapsed={collapsed || mode === LayoutModes.Neat} />
-                </Header>
-              )}
-              <div className="layout-shell">
+              {mode !== LayoutModes.NeatPro && <Header currentWorkspace={workspace} mode={mode} {...props} />}
+              <div className="layout-body">
                 {mode !== LayoutModes.NeatPro && (
-                  <div className="layout-topbar">
-                    <QuickSearch userInfo={props.userInfo} />
-                    <div className="layout-topbar-end">
-                      <ProjectPicker />
-                    </div>
-                  </div>
+                  <Sidebar collapsed={collapsed || mode === LayoutModes.Neat} onToggleCollapsed={toggleCollapsed} />
                 )}
-                <div className="layout-content">
-                  <LayoutRouter></LayoutRouter>
+                <div className="layout-shell">
+                  {mode === LayoutModes.Default && <RecentTabs />}
+                  <div className="layout-content">
+                    <LayoutRouter></LayoutRouter>
+                  </div>
                 </div>
               </div>
             </div>

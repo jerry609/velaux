@@ -9,12 +9,13 @@ import { visibleLabels } from '../../utils/appMeta';
 import { projectChanged, scopedTo } from '../../utils/currentProject';
 import { deleteApplication } from '../../api/application';
 import { If } from '../../components/If';
-import { ListTitle } from '../../components/ListTitle';
+import { PageGuide } from '../../components/Console';
 import Permission from '../../components/Permission';
 import { Translation } from '../../components/Translation';
 import type { ApplicationBase, Env, LoginUserInfo } from '@velaux/data';
 
-import { NewServiceDialog } from './components/NewServiceDialog';
+import { Link } from 'dva/router';
+import { AiOutlineAppstoreAdd, AiOutlineCluster, AiOutlineDeploymentUnit } from 'react-icons/ai';
 import CardContend from './components/CardContent';
 import EditAppDialog from './components/EditAppDialog';
 import SelectSearch from './components/SelectSearch';
@@ -32,7 +33,6 @@ type Props = {
 export type ShowMode = 'table' | 'card' | string | null;
 
 type State = {
-  showAddApplication: boolean;
   isLoading: boolean;
   showEditApplication: boolean;
   editItem?: ApplicationBase;
@@ -56,10 +56,9 @@ class Application extends Component<Props, State> {
     super(props);
     let mode: ShowMode = localStorage.getItem('application-list-mode');
     if (mode != 'table' && mode != 'card') {
-      mode = 'card';
+      mode = 'table';
     }
     this.state = {
-      showAddApplication: false,
       labelValue: [],
       isLoading: false,
       showEditApplication: false,
@@ -126,11 +125,9 @@ class Application extends Component<Props, State> {
     });
   };
 
-  closeAddApplication = () => {
-    this.setState({
-      showAddApplication: false,
-    });
-    this.getApplications({});
+  // addApplication opens the create page.
+  addApplication = () => {
+    this.props.history.push('/applications/new');
   };
 
   closeEditAppDialog = () => {
@@ -168,9 +165,9 @@ class Application extends Component<Props, State> {
   };
 
   render() {
-    const { dispatch, envs, userInfo } = this.props;
+    const { dispatch, envs } = this.props;
     const applicationList = scopedTo(this.props.applicationList, this.props.currentProject, (a) => a.project?.name);
-    const { showAddApplication, isLoading, showEditApplication, editItem, labelValue, showMode } = this.state;
+    const { isLoading, showEditApplication, editItem, labelValue, showMode } = this.state;
     let appLabels: string[] = [];
     applicationList?.map((app) => {
       app.labels &&
@@ -184,70 +181,92 @@ class Application extends Component<Props, State> {
     });
     return (
       <div>
-        <ListTitle
+        <PageGuide
+          id="applications"
           title="Applications"
-          subTitle="Deploy and manage all your applications"
-          extButtons={[
-            <Permission request={{ resource: 'project:?/application:*', action: 'create' }} project={'?'}>
-              <Button
-                type="primary"
-                onClick={() => {
-                  this.setState({ showAddApplication: true });
-                }}
-              >
-                <Translation>New Application</Translation>
-              </Button>
-            </Permission>,
+          description="Deploy and manage all your applications"
+          steps={[
+            {
+              icon: <AiOutlineCluster />,
+              title: 'Prepare',
+              description: <Translation>Connect clusters, then set up delivery targets and environments</Translation>,
+            },
+            {
+              icon: <AiOutlineAppstoreAdd />,
+              title: 'Create an application',
+              description: <Translation>Name it, bind its environments, then add its components</Translation>,
+            },
+            {
+              icon: <AiOutlineDeploymentUnit />,
+              title: 'Deploy and observe',
+              description: <Translation>Run its workflow, then watch its status, resources and revisions</Translation>,
+            },
           ]}
+          extra={
+            <div className="page-guide-links">
+              <Link to="/clusters">
+                <Translation>Clusters</Translation>
+              </Link>
+              <Link to="/targets">
+                <Translation>Targets</Translation>
+              </Link>
+              <Link to="/envs">
+                <Translation>Environments</Translation>
+              </Link>
+              <Link to="/shared-workflows">
+                <Translation>Workflows</Translation>
+              </Link>
+            </div>
+          }
         />
 
-        <SelectSearch
-          appLabels={appLabels}
-          dispatch={dispatch}
-          setLabelValue={this.setLabelValue}
-          labelValue={labelValue}
-          envs={scopedTo(envs, this.props.currentProject, (env: Env) => env.project?.name)}
-          showMode={showMode}
-          setMode={(mode: ShowMode) => {
-            this.setState({ showMode: mode });
-            if (mode) {
-              localStorage.setItem('application-list-mode', mode);
-            }
-          }}
-          getApplications={(params: any) => {
-            this.getApplications(params);
-          }}
-        />
-        <HealthChips
-          counts={healthCounts(applicationList || [])}
-          value={this.state.health}
-          onChange={(health: HealthFilter) => this.setState({ health })}
-        />
-        <Loading visible={isLoading} fullScreen>
-          <CardContend
-            applications={byHealth(applicationList || [], this.state.health)}
-            editAppPlan={(item: ApplicationBase) => {
-              this.editAppPlan(item);
-            }}
-            clickLabelFilter={this.clickLabelFilter}
+        <div className="console-panel">
+          <SelectSearch
+            appLabels={appLabels}
+            dispatch={dispatch}
+            setLabelValue={this.setLabelValue}
+            labelValue={labelValue}
+            envs={scopedTo(envs, this.props.currentProject, (env: Env) => env.project?.name)}
             showMode={showMode}
-            deleteAppPlan={this.onDeleteApp}
-            setVisible={(visible) => {
-              this.setState({ showAddApplication: visible });
+            setMode={(mode: ShowMode) => {
+              this.setState({ showMode: mode });
+              if (mode) {
+                localStorage.setItem('application-list-mode', mode);
+              }
             }}
-          />
-        </Loading>
-        <If condition={showAddApplication}>
-          <NewServiceDialog
-            projects={userInfo?.projects}
-            project={this.props.currentProject?.current || undefined}
-            onClose={this.closeAddApplication}
-            onCreated={(name: string) => {
-              this.props.history.push(`/applications/${name}/config`);
+            getApplications={(params: any) => {
+              this.getApplications(params);
             }}
+            actions={
+              <Permission request={{ resource: 'project:?/application:*', action: 'create' }} project={'?'}>
+                <Button type="primary" onClick={this.addApplication}>
+                  <Translation>New Application</Translation>
+                </Button>
+              </Permission>
+            }
           />
-        </If>
-
+          <HealthChips
+            counts={healthCounts(applicationList || [])}
+            value={this.state.health}
+            onChange={(health: HealthFilter) => this.setState({ health })}
+          />
+          <Loading visible={isLoading} fullScreen>
+            <CardContend
+              applications={byHealth(applicationList || [], this.state.health)}
+              editAppPlan={(item: ApplicationBase) => {
+                this.editAppPlan(item);
+              }}
+              clickLabelFilter={this.clickLabelFilter}
+              showMode={showMode}
+              deleteAppPlan={this.onDeleteApp}
+              setVisible={(visible) => {
+                if (visible) {
+                  this.addApplication();
+                }
+              }}
+            />
+          </Loading>
+        </div>
         <If condition={showEditApplication && editItem}>
           <EditAppDialog editItem={editItem} onOK={this.closeEditAppDialog} onClose={this.closeEditAppDialog} />
         </If>

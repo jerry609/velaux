@@ -2,6 +2,8 @@ import { connect } from 'dva';
 import React from 'react';
 import { isDefaultDescription, visibleLabels } from '../../../../utils/appMeta';
 import { RowAction } from '../../../../components/RowAction';
+import { RowLinks, TablePager, pageOf } from '../../../../components/Console';
+import { locationService } from '../../../../services/LocationService';
 import './index.less';
 import { Link } from 'dva/router';
 import { Menu, Dropdown, Dialog, Button, Table, Tag, Icon } from '@alifd/next';
@@ -29,6 +31,8 @@ import { checkPermission } from '../../../../utils/permission';
 const { Column } = Table;
 
 type State = {
+  page: number;
+  pageSize: number;
   extendDotVisible: boolean;
   choseIndex: number;
   showLabelMode: Map<string, boolean>;
@@ -61,6 +65,8 @@ class CardContent extends React.Component<Props, State> {
       }
     });
     this.state = {
+      page: 1,
+      pageSize: 10,
       extendDotVisible: false,
       choseIndex: 0,
       showLabelMode: showLabelMode,
@@ -153,10 +159,40 @@ class CardContent extends React.Component<Props, State> {
     }
   };
 
+  // rowLinks are a row's operations: open it, and the edits the user may make.
+  rowLinks = (item: ApplicationBase) => {
+    const { userInfo } = this.props;
+    const project = item?.project?.name || this.props.projectName || '?';
+    const may = (action: string) =>
+      checkPermission({ resource: `project:${project}/application:${item.name}`, action }, project, userInfo);
+    return (
+      <RowLinks
+        links={[
+          { label: 'Details', onClick: () => locationService.push(`/applications/${item.name}/config`) },
+          { label: 'Revisions', onClick: () => locationService.push(`/applications/${item.name}/revisions`) },
+          { label: 'Edit', hidden: !may('update'), onClick: () => this.onEditAppPlan(item) },
+          {
+            label: 'Remove',
+            danger: true,
+            hidden: !may('delete'),
+            onClick: () =>
+              Dialog.confirm({
+                type: 'confirm',
+                content: <Translation>Unrecoverable after deletion, are you sure to delete it?</Translation>,
+                onOk: () => this.onDeleteAppPlan(item.name),
+                locale: locale().Dialog,
+              }),
+          },
+        ]}
+      />
+    );
+  };
+
   getColumns = () => {
     return [
       {
         key: 'name',
+        width: 220,
         title: <Translation>Name</Translation>,
         dataIndex: 'name',
         cell: (v: string, i: number, app: ApplicationBase) => (
@@ -174,12 +210,14 @@ class CardContent extends React.Component<Props, State> {
       },
       {
         key: 'health',
+        width: 110,
         title: <Translation>Health</Translation>,
         dataIndex: 'status',
         cell: (v: ApplicationStatusSummary) => <HealthBadge status={v} />,
       },
       {
         key: 'workflow',
+        width: 120,
         title: <Translation>Workflow</Translation>,
         dataIndex: 'status',
         cell: (v: ApplicationStatusSummary) => (
@@ -188,18 +226,21 @@ class CardContent extends React.Component<Props, State> {
       },
       {
         key: 'components',
+        width: 170,
         title: <Translation>Components</Translation>,
         dataIndex: 'status',
         cell: (v: ApplicationStatusSummary) => <ComponentHealth status={v} compact />,
       },
       {
         key: 'envs',
+        width: 160,
         title: <Translation>Environments</Translation>,
         dataIndex: 'status',
         cell: (v: ApplicationStatusSummary) => <EnvHealth status={v} />,
       },
       {
         key: 'project',
+        width: 120,
         title: <Translation>Project</Translation>,
         dataIndex: 'project',
         cell: (v: Project) => {
@@ -216,6 +257,7 @@ class CardContent extends React.Component<Props, State> {
       },
       {
         key: 'description',
+        width: 200,
         title: <Translation>Description</Translation>,
         dataIndex: 'description',
         cell: (v: string) => {
@@ -225,6 +267,7 @@ class CardContent extends React.Component<Props, State> {
 
       {
         key: 'labels',
+        width: 160,
         title: <Translation>Labels</Translation>,
         dataIndex: 'labels',
         cell: (label: Record<string, string>, i: number, v: ApplicationBase) => {
@@ -274,15 +317,9 @@ class CardContent extends React.Component<Props, State> {
         key: 'operation',
         title: <Translation>Actions</Translation>,
         dataIndex: 'operation',
-        width: '200px',
-        cell: (v: string, i: number, record: ApplicationBase) => {
-          return (
-            <div>
-              {this.isEditPermission(record, true)}
-              {this.isDeletePermission(record, true)}
-            </div>
-          );
-        },
+        width: 200,
+        lock: 'right',
+        cell: (v: string, i: number, record: ApplicationBase) => this.rowLinks(record),
       },
     ];
   };
@@ -319,20 +356,29 @@ class CardContent extends React.Component<Props, State> {
     }
     const columns = this.getColumns();
     if (showMode == 'table') {
+      const { pageSize } = this.state;
+      // A filter that shrinks the list keeps the page in range.
+      const page = Math.min(this.state.page, Math.max(1, Math.ceil(applications.length / pageSize)));
       return (
         <div className="app-table">
           <Table
             locale={locale().Table}
             className="customTable"
             size="medium"
-            style={{ minWidth: '1200px' }}
-            dataSource={applications}
+            dataSource={pageOf(applications, page, pageSize)}
             loading={false}
+            primaryKey="name"
           >
             {columns.map((col) => (
               <Column {...col} key={col.key} align={'left'} />
             ))}
           </Table>
+          <TablePager
+            total={applications.length}
+            page={page}
+            pageSize={pageSize}
+            onChange={(p, size) => this.setState({ page: p, pageSize: size })}
+          />
         </div>
       );
     }

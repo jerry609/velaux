@@ -4,21 +4,13 @@ import { Button, Dialog, Dropdown } from '@alifd/next';
 import axios from 'axios';
 import { connect } from 'dva';
 import { Link, routerRedux } from 'dva/router';
-import {
-  AiOutlineCode,
-  AiOutlineLogout,
-  AiOutlineMenuFold,
-  AiOutlineMenuUnfold,
-  AiOutlineQuestionCircle,
-} from 'react-icons/ai';
+import { AiOutlineCode, AiOutlineDown, AiOutlineHome, AiOutlineLogout, AiOutlineQuestionCircle } from 'react-icons/ai';
 
 import logo from '../../assets/kubevela-logo-white.png';
 import logoMark from '../../assets/KubeVela-01.svg';
-import logoDark from '../../assets/kubevela-logo.png';
 import { loadCustomisation } from '../../api/customisation';
 import type { Customisation } from '../../services/CustomisationService';
 import { customisationService } from '../../services/CustomisationService';
-import { isLight, sidebarTheme } from '../../utils/theme';
 import { If } from '../../components/If';
 import Permission from '../../components/Permission';
 import SwitchLanguage from '../../components/SwitchButton/index';
@@ -29,6 +21,8 @@ import { getData, setData } from '../../utils/cache';
 import { locale } from '../../utils/locale';
 import { getBrowserNameAndVersion } from '../../utils/utils';
 import CloudShell from '../CloudShell';
+import QuickSearch from '../../components/QuickSearch';
+import { ProjectPicker } from '../../components/ProjectPicker';
 
 import { LayoutMode, Workspace } from '@velaux/data';
 import { Dispatch } from 'redux';
@@ -43,10 +37,6 @@ type Props = {
   show?: boolean;
   enabledAddons?: AddonBaseStatus[];
   currentWorkspace?: Workspace;
-  // collapsed minimises the sidebar to its icons.
-  collapsed?: boolean;
-  onToggleCollapsed?: () => void;
-  children?: React.ReactNode;
 };
 
 type State = {
@@ -214,90 +204,63 @@ class Header extends Component<Props, State> {
   };
 
   render() {
-    const { show, userInfo, children, onToggleCollapsed } = this.props;
+    const { show, userInfo } = this.props;
     const admin = this.state.workspaces.find((ws) => ws.name === 'admin');
     // The admin screens open from the user's menu rather than the sidebar.
     const adminMenus =
       admin && userInfo ? menuService.loadMenus(admin, userInfo).flatMap((section) => section.menus) : [];
-    const collapsed = !!this.props.collapsed;
     const { customisation } = this.state;
-    const theme = sidebarTheme(customisation.sidebarColor, customisation.accentColor);
-    const light = !!customisation.sidebarColor && isLight(customisation.sidebarColor);
-    const wordmark = customisation.logoURL || (light ? logoDark : logo);
-    const logoSrc = collapsed ? customisation.iconURL || logoMark : wordmark;
+    const wordmark = customisation.logoURL || logo;
     const userName = userInfo?.alias ? userInfo.alias : userInfo?.name;
 
     return (
-      <div className={classNames('layout-sidebar', { collapsed })} style={theme as React.CSSProperties}>
-        <div className="sidebar-brand">
-          <Link to="/" className="sidebar-logo" title={'Make shipping applications more enjoyable.'}>
-            <img
-              src={logoSrc}
-              className={classNames({
-                'sidebar-logo-invert': collapsed && !customisation.iconURL && !light,
-                'sidebar-logo-plate': !collapsed && customisation.logoURL && !light,
-              })}
-            />
-          </Link>
-          <div
-            className="sidebar-collapse"
-            title={i18n.t(collapsed ? 'Expand' : 'Minimise').toString()}
-            onClick={onToggleCollapsed}
-          >
-            {collapsed ? <AiOutlineMenuUnfold size={18} /> : <AiOutlineMenuFold size={18} />}
-          </div>
+      <div className="console-topnav">
+        <Link to="/" className="topnav-brand" title={'Make shipping applications more enjoyable.'}>
+          <img src={wordmark} className={classNames({ 'topnav-logo-plate': !!customisation.logoURL })} />
+        </Link>
+        <Link to="/" className="topnav-home">
+          <AiOutlineHome size={16} />
+          <span>
+            <Translation>Console Home</Translation>
+          </span>
+        </Link>
+        <div className="topnav-search">
+          <QuickSearch userInfo={userInfo} />
         </div>
-
-        <div className="sidebar-menu">{children}</div>
-
-        <div className="sidebar-footer">
+        <div className="topnav-end">
+          <ProjectPicker />
           <Permission request={{ resource: 'cloudshell', action: 'create' }}>
-            <div className="sidebar-footer-item" title="Open Cloud Shell" onClick={this.onOpenCloudShell}>
+            <span className="topnav-tool" title="Cloud Shell" onClick={this.onOpenCloudShell}>
               <AiOutlineCode size={18} />
-              {!collapsed && (
-                <span>
-                  <Translation>Cloud Shell</Translation>
-                </span>
-              )}
-            </div>
+            </span>
           </Permission>
           <a
-            className="sidebar-footer-item"
-            title="KubeVela Documents"
+            className="topnav-tool"
+            title={i18n.t('Documentation').toString()}
             href="https://kubevela.io"
             target="_blank"
             rel="noopener noreferrer"
           >
             <AiOutlineQuestionCircle size={18} />
-            {!collapsed && (
-              <span>
-                <Translation>Documentation</Translation>
-              </span>
-            )}
           </a>
-          <div className="sidebar-footer-item sidebar-language">
+          <span className="topnav-tool topnav-language">
             <SwitchLanguage />
-            {!collapsed && (
-              <span>
-                <Translation>Language</Translation>
-              </span>
-            )}
-          </div>
+          </span>
           <If condition={userInfo}>
             <Dropdown
               triggerType="hover"
-              align="bl br"
-              offset={[collapsed ? 18 : 22, 0]}
+              align="tr br"
               trigger={
-                <div className="sidebar-user" title={userName}>
-                  <span className="sidebar-avatar">{(userName || '?').slice(0, 1).toUpperCase()}</span>
-                  {!collapsed && <span className="sidebar-user-name">{userName}</span>}
+                <div className="topnav-user" title={userName}>
+                  <span className="topnav-avatar">{(userName || '?').slice(0, 1).toUpperCase()}</span>
+                  <span className="topnav-user-name">{userName}</span>
+                  <AiOutlineDown size={12} />
                 </div>
               }
             >
               <div className="user-flyout">
                 <div className="user-flyout-head">
-                  <span className="sidebar-avatar">{(userName || '?').slice(0, 1).toUpperCase()}</span>
+                  <span className="topnav-avatar">{(userName || '?').slice(0, 1).toUpperCase()}</span>
                   <div>
                     <div className="user-flyout-name">{userName}</div>
                     {userInfo?.name && userInfo.name !== userName && (

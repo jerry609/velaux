@@ -34,22 +34,29 @@
   }
 }
 
-// The configs list: a search, a template filter and refresh above one table.
-.configs-toolbar {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 16px;
-  .configs-search {
-    width: 360px;
+// The configs list's head: the toolbar, then a tab per template above the
+// table, as a console lists one kind of resource by its types.
+.configs-head {
+  padding-bottom: 0;
+  .list-toolbar {
+    margin-bottom: 4px;
   }
-  .configs-search-icon {
-    margin-left: 10px;
-    color: #94a3b8;
+}
+
+.configs-tabs {
+  .next-tabs-bar {
+    border-bottom: none;
   }
-  .configs-template-filter {
-    width: 280px;
-  }
+}
+
+.configs-tab-count {
+  margin-left: 6px;
+  padding: 0 6px;
+  color: var(--c-text-3);
+  font-size: 12px;
+  line-height: 18px;
+  background: var(--c-surface-2);
+  border-radius: 9px;
 }
 
 .config-template {

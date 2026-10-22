@@ -1,18 +1,18 @@
-import { Table, Button, Pagination, Dialog, Message } from '@alifd/next';
-import { Link } from 'dva/router';
+import { Table, Button, Dialog, Message } from '@alifd/next';
+import { Link, routerRedux } from 'dva/router';
 import React, { Fragment, Component } from 'react';
-import { RowAction } from '../../components/RowAction';
-import { AiOutlineDelete, AiOutlineEdit } from 'react-icons/ai';
 
 import { getProjectList, deleteProject } from '../../api/project';
 import { getUserList } from '../../api/users';
 import { If } from '../../components/If';
 import { ListTitle as Title } from '../../components/ListTitle';
+import { ListToolbar, RowLinks, TablePager } from '../../components/Console';
 import Permission from '../../components/Permission';
 import { Translation } from '../../components/Translation';
-import type { NameAlias, Project, User } from '@velaux/data';
+import type { LoginUserInfo, NameAlias, Project, User } from '@velaux/data';
 import { momentDate } from '../../utils/common';
 import { locale } from '../../utils/locale';
+import { checkPermission } from '../../utils/permission';
 
 import CreateProjectDialog from './components/CreateProjectDialog';
 
@@ -21,6 +21,7 @@ import { connect } from 'dva';
 
 type Props = {
   dispatch: ({}) => void;
+  userInfo?: LoginUserInfo;
 };
 
 type State = {
@@ -33,9 +34,12 @@ type State = {
   editProjectItem: Project;
   isLoading: boolean;
   userList: User[];
+  query: string;
 };
 
-@connect()
+@connect((store: any) => {
+  return { ...store.user };
+})
 class Projects extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
@@ -49,6 +53,7 @@ class Projects extends Component<Props, State> {
       editProjectItem: { name: '' },
       isLoading: false,
       userList: [],
+      query: '',
     };
   }
   componentDidMount() {
@@ -139,10 +144,11 @@ class Projects extends Component<Props, State> {
     });
   };
 
-  handleChange = (page: number) => {
+  handleChange = (page: number, pageSize: number) => {
     this.setState(
       {
         page,
+        pageSize,
       },
       () => {
         this.listProjects();
@@ -200,65 +206,63 @@ class Projects extends Component<Props, State> {
         key: 'operation',
         title: <Translation>Actions</Translation>,
         dataIndex: 'operation',
+        width: 160,
+        lock: 'right',
         cell: (v: string, i: number, record: Project) => {
+          const may = (action: string) =>
+            checkPermission({ resource: `project:${record.name}`, action }, record.name, this.props.userInfo);
           return (
-            <Fragment>
-              <Permission request={{ resource: `project:${record.name}`, action: 'update' }} project={`${record.name}`}>
-                <RowAction
-                  icon={<AiOutlineEdit />}
-                  label="Edit"
-                  onClick={() => {
-                    this.onEdit(record);
-                  }}
-                />
-              </Permission>
-              <Permission request={{ resource: `project:${record.name}`, action: 'delete' }} project={`${record.name}`}>
-                <RowAction
-                  icon={<AiOutlineDelete />}
-                  label="Delete"
-                  danger
-                  onClick={() => {
-                    this.onDelete(record);
-                  }}
-                />
-              </Permission>
-            </Fragment>
+            <RowLinks
+              links={[
+                { label: 'Details', onClick: () => this.props.dispatch(routerRedux.push(`/projects/${record.name}`)) },
+                { label: 'Edit', hidden: !may('update'), onClick: () => this.onEdit(record) },
+                { label: 'Delete', danger: true, hidden: !may('delete'), onClick: () => this.onDelete(record) },
+              ]}
+            />
           );
         },
       },
     ];
 
     const { Column } = Table;
-    const { list, page, pageSize, total, visible, isEditProject, editProjectItem, isLoading, userList } = this.state;
+    const { list, page, pageSize, total, visible, isEditProject, editProjectItem, isLoading, userList, query } =
+      this.state;
+    // The search narrows the page in view by name, alias or description.
+    const keyword = query.trim().toLowerCase();
+    const shown = keyword
+      ? list.filter((p) => [p.name, p.alias, p.description].some((f) => (f || '').toLowerCase().includes(keyword)))
+      : list;
     return (
       <Fragment>
         <div className="project-list-content">
-          <Title
-            title="Projects"
-            subTitle="Projects are used to allocate and isolate resources"
-            extButtons={[
-              <Permission request={{ resource: 'project:*', action: 'create' }} project={''}>
-                <Button type="primary" onClick={this.handleClickCreate}>
-                  <Translation>New Project</Translation>
-                </Button>
-              </Permission>,
-            ]}
-          />
-          <Table locale={locale().Table} dataSource={list} loading={isLoading}>
-            {columns.map((col, key) => (
-              <Column {...col} key={key} align={'left'} />
-            ))}
-          </Table>
-
-          <Pagination
-            className="margin-top-20 text-align-right"
-            total={total}
-            locale={locale().Pagination}
-            size="medium"
-            pageSize={pageSize}
-            current={page}
-            onChange={this.handleChange}
-          />
+          <Title title="Projects" subTitle="Projects are used to allocate and isolate resources" />
+          <div className="console-panel">
+            <div className="console-panel-body">
+              <ListToolbar
+                search={{
+                  value: query,
+                  placeholder: 'Search by name, alias or description',
+                  live: true,
+                  onSearch: (value: string) => this.setState({ query: value }),
+                }}
+                onRefresh={this.listProjects}
+                refreshing={isLoading}
+                actions={
+                  <Permission request={{ resource: 'project:*', action: 'create' }} project={''}>
+                    <Button type="primary" onClick={this.handleClickCreate}>
+                      <Translation>New Project</Translation>
+                    </Button>
+                  </Permission>
+                }
+              />
+            </div>
+            <Table locale={locale().Table} dataSource={shown} loading={isLoading} primaryKey="name">
+              {columns.map((col, key) => (
+                <Column {...col} key={key} align={'left'} />
+              ))}
+            </Table>
+            <TablePager total={total} page={page} pageSize={pageSize} onChange={this.handleChange} />
+          </div>
 
           <If condition={visible}>
             <CreateProjectDialog

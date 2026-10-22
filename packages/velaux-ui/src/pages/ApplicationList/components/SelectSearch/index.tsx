@@ -1,4 +1,4 @@
-import { Select, Input } from '@alifd/next';
+import { Button, Select, Input } from '@alifd/next';
 import React from 'react';
 
 import './index.less';
@@ -6,10 +6,7 @@ import type { ShowMode } from '../..';
 import type { Env } from '@velaux/data';
 import { locale } from '../../../../utils/locale';
 import i18n from '../../../../i18n';
-import { AiOutlineReload, AiOutlineSearch } from 'react-icons/ai';
-
-import { RowAction } from '../../../../components/RowAction';
-import { Translation } from '../../../../components/Translation';
+import { AiOutlineAppstore, AiOutlineReload, AiOutlineSearch, AiOutlineUnorderedList } from 'react-icons/ai';
 
 type Props = {
   dispatch: ({}) => {};
@@ -20,6 +17,8 @@ type Props = {
   getApplications: (params: any) => void;
   setMode: (mode: ShowMode) => void;
   showMode: ShowMode;
+  // actions sit before refresh and the view, the page's create action.
+  actions?: React.ReactNode;
 };
 
 type State = {
@@ -152,24 +151,32 @@ class SelectSearch extends React.Component<Props, State> {
           dataSource={labelSource}
         />
         <div className="app-filter-bar-actions">
-          <RowAction icon={<AiOutlineReload />} label="Refresh" onClick={() => this.getApplications()} />
-          <div className="app-filter-bar-mode" role="group" aria-label="View">
-            <button
-              type="button"
-              className={showMode == 'card' ? 'active' : ''}
-              aria-pressed={showMode == 'card'}
-              onClick={() => this.props.setMode('card')}
-            >
-              <Translation>Card</Translation>
-            </button>
-            <button
-              type="button"
+          {this.props.actions}
+          <Button
+            className="list-toolbar-icon"
+            title={i18n.t('Refresh').toString()}
+            aria-label={i18n.t('Refresh').toString()}
+            onClick={() => this.getApplications()}
+          >
+            <AiOutlineReload />
+          </Button>
+          <div className="list-toolbar-view" role="group" aria-label={i18n.t('View').toString()}>
+            <span
               className={showMode == 'table' ? 'active' : ''}
+              title={i18n.t('Table').toString()}
               aria-pressed={showMode == 'table'}
               onClick={() => this.props.setMode('table')}
             >
-              <Translation>Table</Translation>
-            </button>
+              <AiOutlineUnorderedList />
+            </span>
+            <span
+              className={showMode == 'card' ? 'active' : ''}
+              title={i18n.t('Card').toString()}
+              aria-pressed={showMode == 'card'}
+              onClick={() => this.props.setMode('card')}
+            >
+              <AiOutlineAppstore />
+            </span>
           </div>
         </div>
       </div>

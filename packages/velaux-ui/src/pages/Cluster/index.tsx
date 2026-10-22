@@ -1,12 +1,12 @@
 import { Button, Message } from '@alifd/next';
 import { connect } from 'dva';
-import React, { Fragment } from 'react';
+import React from 'react';
 
 import { getEnabledAddons, getAddonsList } from '../../api/addons';
 
 import { deleteCluster } from '../../api/cluster';
 import { If } from '../../components/If';
-import { ListTitle } from '../../components/ListTitle';
+import { ListToolbar, PageGuide } from '../../components/Console';
 import Permission from '../../components/Permission';
 import { Translation } from '../../components/Translation';
 import type { Addon } from '@velaux/data';
@@ -14,7 +14,8 @@ import type { Addon } from '@velaux/data';
 import AddClusterDialog from './components/AddClusterDialog/index';
 import CardContend from './components/CardContent/index';
 import CloudServiceDialog from './components/CloudServiceDialog/index';
-import SelectSearch from './components/ClusterSelectSearch';
+import { Link } from 'dva/router';
+import { AiOutlineAppstoreAdd, AiOutlineAim, AiOutlineCluster } from 'react-icons/ai';
 
 type Props = {
   clusterList: [];
@@ -150,35 +151,43 @@ class Cluster extends React.Component<Props, State> {
     } = this.state;
     return (
       <div>
-        <ListTitle
+        <PageGuide
+          id="clusters"
           title="Clusters"
-          subTitle="Setup Kubernetes clusters by adding an existing one or creating a new one via cloud provider"
-          extButtons={[
-            <Fragment>
-              <Permission request={{ resource: 'cluster:*', action: 'create' }} project={''}>
-                <Button
-                  type="secondary"
-                  style={{ marginRight: '16px' }}
-                  onClick={() => {
-                    this.setState({ showAddCloudCluster: true });
-                  }}
-                >
-                  <Translation>Connect From Cloud</Translation>
-                </Button>
-                <Button
-                  type="primary"
-                  style={{ marginRight: '16px' }}
-                  onClick={() => {
-                    this.setState({ showAddCluster: true });
-                  }}
-                >
-                  <Translation>Connect Existing Cluster</Translation>
-                </Button>
-              </Permission>
-            </Fragment>,
+          description="Setup Kubernetes clusters by adding an existing one or creating a new one via cloud provider"
+          steps={[
+            {
+              icon: <AiOutlineCluster />,
+              title: 'Connect a cluster',
+              description: (
+                <Translation>Add an existing cluster by its kubeconfig, or connect one from a cloud</Translation>
+              ),
+            },
+            {
+              icon: <AiOutlineAppstoreAdd />,
+              title: 'Install addons',
+              description: <Translation>Enable the addons its applications need on the new cluster</Translation>,
+            },
+            {
+              icon: <AiOutlineAim />,
+              title: 'Deliver to it',
+              description: <Translation>Bind it as a target, so environments can deploy to it</Translation>,
+            },
           ]}
+          extra={
+            <div className="page-guide-links">
+              <Link to="/addons">
+                <Translation>Addons</Translation>
+              </Link>
+              <Link to="/targets">
+                <Translation>Targets</Translation>
+              </Link>
+              <Link to="/envs">
+                <Translation>Environments</Translation>
+              </Link>
+            </div>
+          }
         />
-
         <If condition={isShowAddonMessage && addonMessage.length != 0}>
           <Message type="notice" closeable onClose={this.handleHiddenAddonMessage}>
             Connect Cluster Success! Please upgrade {this.showAddonMessage()} addons, make them take effect in the new
@@ -186,18 +195,45 @@ class Cluster extends React.Component<Props, State> {
           </Message>
         </If>
 
-        <SelectSearch
-          query={(q: string) => {
-            this.query(q);
-          }}
-        />
-        <CardContend
-          editCluster={(name: string) => {
-            this.setState({ showAddCluster: true, editClusterName: name });
-          }}
-          deleteCluster={this.onDeleteCluster}
-          clusters={clusterList}
-        />
+        <div className="console-panel">
+          <div className="console-panel-body" style={{ paddingBottom: 4 }}>
+            <ListToolbar
+              search={{
+                value: query,
+                placeholder: 'Search by Name and Description etc',
+                onSearch: (q: string) => this.query(q),
+              }}
+              onRefresh={this.getClusterList}
+              actions={
+                <Permission request={{ resource: 'cluster:*', action: 'create' }} project={''}>
+                  <Button
+                    onClick={() => {
+                      this.setState({ showAddCloudCluster: true });
+                    }}
+                  >
+                    <Translation>Connect From Cloud</Translation>
+                  </Button>
+                  <Button
+                    type="primary"
+                    style={{ marginLeft: 8 }}
+                    onClick={() => {
+                      this.setState({ showAddCluster: true });
+                    }}
+                  >
+                    <Translation>Connect Existing Cluster</Translation>
+                  </Button>
+                </Permission>
+              }
+            />
+          </div>
+          <CardContend
+            editCluster={(name: string) => {
+              this.setState({ showAddCluster: true, editClusterName: name });
+            }}
+            deleteCluster={this.onDeleteCluster}
+            clusters={clusterList}
+          />
+        </div>
         <div>
           <If condition={showAddCloudCluster}>
             <CloudServiceDialog
